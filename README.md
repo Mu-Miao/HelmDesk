@@ -1,50 +1,157 @@
 # 领航台 · HelmDesk
 
-在 Codex 里指挥，在领航台里看见。
+**让 Codex 调度 Qoder，让每一次交付都有据可查。**
 
-本机 CLI Agent 调度工作台：通过已登录的 Qoder CN 官方 CLI 执行任务，用 SQLite 保存过程，通过 stdio MCP 接入宿主，并提供中文 React 看板。执行完成、独立验证和审核接受分别记录；宿主审阅后明确整合交付。
+HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex 里描述目标，由它拆解任务、审查结果；Qoder 在独立工作区完成明确范围内的改动；领航台把队列、差异、验证和用量放进同一个中文看板。
 
-## 环境与启动
+**macOS · Node.js 24+ · TypeScript / React · SQLite · 28 项 MCP 工具**
 
-- macOS、Node.js 24+。
-- 已登录的 Qoder CN 官方 CLI 或 Qoder CN App；HelmDesk 不要求额外提供模型 API Key。
-- 隔离使用 macOS `sandbox-exec`，执行前检查失败会拒绝派发。
+[快速上手](docs/quickstart.md) · [博客教程](https://blog.mashutaba.best/post/helmdesk-quickstart) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [公开范围](docs/公开范围.md)
 
-```sh
-npm ci
-npm run check
-npm test
-npm run dev
+## 它解决什么问题
+
+把一项工作分给另一个 Agent 后，你仍然需要知道：它改了什么、有没有通过检查、能不能合回原项目，以及用了多少额度。HelmDesk 将这些信息保存在本机，让派发和验收能接上。
+
+```text
+你描述目标
+    ↓
+Codex 拆解任务，通过 MCP 派发
+    ↓
+HelmDesk 建立独立工作区，记录过程与用量
+    ↓
+Qoder 执行 → Codex 验证与审核 → 明确整合
 ```
 
-打开 <http://127.0.0.1:4317/>。`dev` 构建后启动服务，修改源码后需重新构建并重启；开发数据写入忽略的 `.helmdesk/`。`.npmrc` 禁止依赖安装脚本，并跳过未使用的可选 peer 工具链；执行器使用本机已有 CLI。
+适合把范围清楚的文档、组件和独立模块交给执行者，再由宿主集中审核。模型执行和 Codex 审核都会消耗各自额度，是否更省取决于任务划分、上下文大小和返工次数。
 
-也可分开构建和启动：
+## 已经可以做什么
+
+| 能力 | 具体行为 |
+| --- | --- |
+| 派发与协作 | 单槽位或显式双槽位运行，展示排队及依赖阻塞原因 |
+| 独立工作区 | 干净 Git 仓库建立 detached worktree，非 Git 项目建立副本 |
+| 模型与思考深度 | 从 CLI 目录选模型；Flash 支持低、中、极高，任务创建后固定选择 |
+| 可读的交付 | Markdown 摘要、按文件折叠的差异、事件时间线、审核报告 |
+| 验证与整合 | 执行、验证、验收分别记录；预检冲突，导出并校验补丁 |
+| 项目与修订 | 按项目查看任务和已记录用量，显式修订保留新旧历史 |
+| 紧凑读取 | 分页摘要与批量等待减少重复返回，完整证据按需读取 |
+| 运行控制 | 时限、可选轮数上限、按执行器和模型区分的累计 Credits 阈值 |
+
+## 先把看板跑起来
+
+需要 **macOS、Git、Node.js 24+**，以及已登录的 **Qoder CN 官方 CLI 或 Qoder CN App**。HelmDesk 复用已有 CLI 登录，不要求额外填写模型 API Key。
 
 ```sh
+git clone https://github.com/Mu-Miao/HelmDesk.git
+cd HelmDesk
+npm ci
 npm run build
+node dist/cli.js doctor --data-dir .helmdesk
+```
+
+`doctor` 不调用模型推理。检查输出中 `agent`、`models`、`isolation` 三项均为 `fulfilled`，且 `isolation.value.verified` 为 `true`；进程退出成功并不代表每项探测成功。CLI 登录、模型目录或隔离有问题时，先处理对应原因。
+
+```sh
 node dist/cli.js serve --data-dir .helmdesk --concurrency 2
 ```
 
-默认并发为 1，只接受 1 或 2。直接 `npm start` 的默认数据目录为 `~/Library/Application Support/HelmDesk/`；可用 `--data-dir` 或 `HELMDESK_DATA_DIR` 修改。服务与 MCP 必须使用同一数据目录。
+保留终端，打开 **<http://127.0.0.1:4317/>**。默认并发为 1，示例明确开启 2；只支持 1 或 2。看板用于查看和审核过程，派发入口在 MCP 宿主中。
 
-`node dist/cli.js doctor --data-dir .helmdesk` 检查版本、模型目录和隔离，不发起模型推理。`probe` 会调用真实模型并消耗账号额度，不要在同数据目录服务运行时另行执行。
+后续可用 `npm run dev` 构建并启动单槽位服务；源码修改后需重新构建并重启。不要在同一数据目录重复启动服务。
 
-## 接入 MCP
+## 再把 Codex 接进来
 
-构建后按 [MCP 配置示例](docs/codex-mcp.toml.example) 添加服务，把路径改为本机绝对路径：
+在 HelmDesk 根目录执行 `command -v node` 和 `pwd`，取得 Node 与项目的实际路径，再按 [完整配置示例](docs/codex-mcp.toml.example) 设置 stdio MCP：
 
 ```toml
 [mcp_servers.helmdesk]
 command = "/absolute/path/to/node"
+cwd = "/absolute/path/to/HelmDesk"
 args = ["/absolute/path/to/HelmDesk/dist/cli.js", "mcp", "--data-dir", "/absolute/path/to/HelmDesk/.helmdesk", "--autostart-service", "--concurrency", "2"]
 ```
 
-可选宿主脚本 `node scripts/register-codex-mcp.mjs` 先检查，显式加 `--apply` 才通过本机 Codex 官方 CLI 注册；修改前在私有数据目录备份配置。脚本当前适用于默认安装位置的 macOS 桌面应用。普通服务和任务执行者不会修改宿主配置、技能、插件或记忆。
+占位路径必须替换，`--data-dir` 必须指向服务使用的同一目录。Codex 支持在 `~/.codex/config.toml` 的 `mcp_servers` 表里配置本地 STDIO 服务；入口详见 [OpenAI 官方 MCP 文档](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)。保存后重新连接 MCP；若工具目录未刷新，重新打开聊天或重启客户端再检查。
 
-`--autostart-service` 在首次工具调用时启动缺失的后台服务；已有服务保持原配置。它不意味着开机启动或无人值守派活。更新工具后，旧 MCP 客户端需重连以刷新目录。
+连接后先让 Codex 调用 `queue_get`，确认能读取队列；再检查 `models_list`，选择当前账号实际可用的模型。当前接口共 28 项，完整分类见下方。
 
-共 28 项工具：
+<details>
+<summary>可选：通过本机官方 CLI 注册</summary>
+
+在 HelmDesk 根目录执行：
+
+```sh
+node scripts/register-codex-mcp.mjs
+node scripts/register-codex-mcp.mjs --apply
+```
+
+第一条检查，第二条才明确注册，并在私有数据目录备份宿主配置。该脚本目前适配默认安装位置的 macOS 桌面应用；安装位置不同请使用上面的手动配置。普通服务和执行者不会修改宿主配置、技能、插件或记忆。
+
+</details>
+
+## 第一次任务，先从一个文件开始
+
+跟随 [快速上手](docs/quickstart.md) 创建专用演示项目，再把这样的要求发给 Codex：
+
+> 用领航台处理这个干净的演示仓库。使用 Qwen3.8-Flash、极高思考深度，只允许创建 HELLO.md。完成后先检查完整文件、差异和原项目是否保持不变，记录验证结果，再决定是否验收；我明确要求整合时才应用补丁。
+
+模型须出现在当前 CLI 目录。任务中的 `projectPath` 使用真实绝对路径，`allowedFiles` 明确到文件。省略模型时继承已保存的默认值；模型和深度创建后固定，不支持的选择会报错，不静默降档或换模型。
+
+日常流程是：
+
+1. **派发**：用 `task_submit` 写清范围、验收条件和时限。
+2. **等待**：优先使用摘要和 `tasks_watch`，有变化再读取完整交付。
+3. **验证**：宿主检查文件并运行适合该改动的检查，用 `task_verify` 记录命令与证据。
+4. **验收**：用 `task_review` 接受或要求返工；依赖只有在前置交付已接受后才放行。
+5. **整合**：明确选择文件，预检并导出补丁；宿主审阅、检查后明确应用。
+
+**`completed` 只表示执行结束，不能代替验证或验收。** 冲突、过期预览和变更后的交付会阻止导出；HelmDesk 不自动写回原项目。
+
+## 数据和权限
+
+- **本机访问**：服务仅监听 `127.0.0.1`，检查 Host / Origin，网页写操作使用会话与 CSRF，MCP 使用私有连接令牌。
+- **明确项目范围**：默认只接受服务启动目录及子目录；其他位置须启动前通过 `HELMDESK_PROJECT_ROOTS` 明确配置，macOS 用 `:` 分隔。Git 项目必须是干净且已有提交的仓库根目录。
+- **受限文件工具**：执行者只开放 `Read / Write / Edit / Glob / Grep`，写入受白名单限制，不开放 Shell、子代理或递归派活。宿主负责终端验证和整合。
+- **隔离与过滤**：任务副本排除 `.env*`、凭据和宿主配置目录、依赖及构建产物；拒绝符号链接。当前限制 2000 个文件、单文件 2MB、合计 20MB。Git checkout 后也清除排除项。
+- **显式共享**：Skills 和本地只读 MCP 须按 [示例](docs/sharing.example.json) 选择、批准，再逐任务授权；不自动导出宿主配置、OAuth 或登录令牌。
+- **保留现场**：取消与失败保留工作副本及历史；异常重启不自动重试，也不凭历史 PID 误杀新进程。
+
+使用 `--data-dir .helmdesk` 时，数据库、日志、任务副本、用量和连接凭据都留在忽略的 `.helmdesk/`。不传数据目录时，macOS 默认写入 `~/Library/Application Support/HelmDesk/`。这些数据可能包含项目内容，不要上传到公开仓库。
+
+## 常见问题
+
+| 情况 | 先检查什么 |
+| --- | --- |
+| 找不到 CLI 或模型 | 运行 `doctor`，确认官方 CLI/App 已安装并登录；CLI 路径可用 `HELMDESK_QODER_CLI` 指定 |
+| 看板能开，MCP 连接失败 | Node/脚本绝对路径、构建输出，以及两边是否使用同一个数据目录 |
+| 新工具没有出现 | 重新连接 MCP，必要时重新打开聊天或重启客户端 |
+| Git 项目被拒绝 | 是否指向仓库根目录、已有提交且工作区干净；不要为派发丢弃未提交改动 |
+| 项目在范围外 | 在启动服务前明确配置 `HELMDESK_PROJECT_ROOTS`，再重启服务 |
+| 沙箱检查不通过 | 查看 `doctor` 中的具体原因，当前只支持 macOS；不跳过隔离强行运行 |
+| 用量是未知 | 上游没有提供该字段；未知不等于零，不能据此判断免费 |
+
+Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。
+
+## 开发与文档
+
+```sh
+npm run check
+npm test
+npm run build
+```
+
+当前 222 项自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
+
+| 文档 | 内容 |
+| --- | --- |
+| [快速上手](docs/quickstart.md) | 安装、MCP 接入、演示项目和第一次完整交付，也提供博客版 |
+| [日常使用与验收](docs/v0.1日常使用与验收.md) | 操作步骤、恢复处理和验收清单 |
+| [MCP 配置](docs/codex-mcp.toml.example) | 本地 stdio 配置模板 |
+| [能力共享配置](docs/sharing.example.json) | 显式批准 Skills 与只读 MCP |
+| [公开范围](docs/公开范围.md) | 源码与私有资料的边界、提交前检查 |
+| [第三方来源与许可](THIRD_PARTY_NOTICES.md) | React Bits 及依赖声明 |
+
+<details>
+<summary>28 项 MCP 工具</summary>
 
 | 用途 | 工具 |
 | --- | --- |
@@ -55,61 +162,10 @@ args = ["/absolute/path/to/HelmDesk/dist/cli.js", "mcp", "--data-dir", "/absolut
 | 执行器、模型与额度 | `agents_list`、`models_list`、`model_preference_get`、`model_preference_set`、`execution_policy_get`、`execution_policy_set`、`usage_get` |
 | 能力来源 | `capabilities_list`、`capabilities_refresh` |
 
-## 日常协作
+</details>
 
-完整流程见 [v0.1 使用与验收手册](docs/v0.1日常使用与验收.md)。提交文件任务示例：
+## 界面来源与当前范围
 
-```json
-{
-  "title": "补充配置说明",
-  "prompt": "阅读 README.md，在 docs/config.md 中说明配置项。只修改该文件。",
-  "projectPath": "/absolute/path/to/project",
-  "allowedFiles": ["docs/config.md"],
-  "acceptanceCriteria": ["说明与源代码一致", "没有修改范围外文件"],
-  "agent": "qoder-cn",
-  "model": "Qwen3.8-Flash",
-  "reasoningEffort": "xhigh",
-  "mode": "files",
-  "timeoutSeconds": 120
-}
-```
+玻璃导航、波纹和 AeroShards 等视觉效果源自 **React Bits**，部分版本经作者博客取用并适配。碎片背景固定于视口；缺少 WebGPU 或偏好减少动态效果时降级为静态背景。完整版权与条款见 [第三方来源与许可](THIRD_PARTY_NOTICES.md)。原创代码未另行指定统一开源许可证。
 
-模型目录来自当前 CLI。省略模型时继承保存的默认值，任务创建后固定；支持的思考深度由官方 SDK 再次检查，不支持则停止，不静默降档或切换模型。Qwen3.8-Flash 提供低、中、极高选项，初始默认极高。自定义模型按其实际 ID 区分。
-
-优先读取紧凑摘要，按需取完整文件与事件。批量等待最多 8 项、55 秒，只返回版本变化。完成后宿主独立检查，再用 `task_verify` 记录证据，随后 `task_review` 接受或要求返工。依赖仅在前置任务已完成且已接受时放行。
-
-文件任务可对照原始基线检查整合，区分可整合、冲突、已一致和不支持；补丁导出重新核对，网页校验 SHA-256。宿主明确应用补丁，HelmDesk 不自动写回原项目。只读交付输入固定摘要与快照；受控修订保留新旧记录，并通过持久化请求编号避免重复提交。
-
-用量区分 Credits、Tokens、USD、已知零与未知。累计 Credits 阈值只能阻止后续派发，不能限制在途费用，也不代表账号余额。最大轮数可选 1–100，时限 10–600 秒；不会自动重试或续接会话。
-
-## 隔离与数据边界
-
-- 服务仅监听 `127.0.0.1`，检查 Host / Origin；网页写操作使用本机会话与 CSRF，MCP 使用私有连接令牌。
-- 服务默认只接受启动目录及子目录的项目；其他根目录须启动前通过 `HELMDESK_PROJECT_ROOTS` 明确配置，macOS 用 `:` 分隔。
-- 干净且已有提交的 Git 仓库使用独立 detached worktree，非 Git 项目使用独立副本。任务工作区排除 `.env*`、`.aws`、`.codex`、`.qoder`、依赖及构建目录；拒绝符号链接，限制 2000 文件、单文件 2MB、合计 20MB。
-- 执行者只开放 `Read`、`Write`、`Edit`、`Glob`、`Grep`；写入受 `allowedFiles` 限制，没有 Shell、子代理或递归派发工具。OS 隔离检查来源不可读写、快照只读及运行后来源摘要。
-- 每项 Qoder 任务使用独立配置目录，以只读引用复用现有登录，不复制登录令牌。执行者的用户设置、原生技能、插件和自动记忆关闭。
-- 共享技能与 MCP 须在私有数据目录的 `sharing.json` 显式选择并批准，再按任务选择；[配置示例](docs/sharing.example.json) 使用占位路径且默认未批准。首版仅支持本地 Node stdio、只读工具和禁网网关，不自动转发 OAuth 或宿主管理连接器。
-- Markdown 不执行原始 HTML 或加载远程图片；常见认证字段和授权链接在记录事件前脱敏。数据库、日志、凭据、工作副本、提示词与交付可能包含敏感内容，均不属于公开源码。
-
-取消任务会终止当前服务拥有的进程组并保留工作区。服务异常重启后不会自动重试，也不会凭历史 PID 误杀新进程；先核对状态，再决定取消或新建任务。
-
-## 验证与公开范围
-
-```sh
-npm run check
-npm test
-npm run build
-```
-
-222 项自动测试使用本地替身、假数据和临时目录，不消耗模型额度。部分测试需要正常宿主权限以监听 loopback 或检查 macOS 沙箱。真实模型任务另外计费，不在自动测试中调用。
-
-公开仓库保留源码、测试、通用文档和示例；运行数据、个人配置、开发聊天、历史任务记录、内部验收脚本、日志和设计草图留在本地。首次公开前检查凭据模式、本机路径、提交清单与构建测试；以后可用 `node scripts/check-publication.mjs` 检查暂存内容。详情见 [公开范围说明](docs/公开范围.md)。
-
-## 界面来源与限制
-
-React 看板包含项目概览、集中验收、Markdown 摘要、折叠差异、时间线及模型/思考深度设置。玻璃导航、波纹与碎片等视觉效果的原始来源为 React Bits，部分代码经作者博客中的版本取用并适配；博客不是这些效果的原创来源。AeroShards 背景固定于视口，WebGPU 不可用或减少动态效果时降级为静态背景。
-
-来源与第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。公开源码不改变第三方许可，原创部分未另行指定统一开源许可证；`private: true` 阻止误发布到 npm。
-
-当前面向 macOS 本机单用户；Ollama 仅支持已安装本地模型的单轮无工具任务。尚不支持远程访问、自动合并/发布、无人值守续跑、Claude/Gemini 适配器或更高并发。
+v0.1 面向 macOS 本机单用户，已实现 Qoder CN 与受限 Ollama 适配；暂不支持远程访问、更高并发、Claude/Gemini 适配器、自动合并发布或无人值守续跑。

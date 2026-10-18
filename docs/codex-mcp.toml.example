@@ -1,4 +1,5 @@
 # 先运行 npm run build；MCP 按需启动缺失的服务。不要把派活工具转发给执行者。
 [mcp_servers.helmdesk]
 command = "/absolute/path/to/node"
+cwd = "/absolute/path/to/HelmDesk"
 args = ["/absolute/path/to/HelmDesk/dist/cli.js", "mcp", "--data-dir", "/absolute/path/to/HelmDesk/.helmdesk", "--autostart-service", "--concurrency", "2"]

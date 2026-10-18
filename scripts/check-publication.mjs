@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 
 const git=args=>execFileSync('git',args,{maxBuffer:20_000_000});
 const publicRoots=new Set(['.gitignore','.npmrc','README.md','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','tsconfig.json','tsconfig.test.json','tsconfig.web.json','vite.config.ts']);
-const publicExtras=new Set(['docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs']);
+const publicExtras=new Set(['docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/quickstart.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs']);
 const rules=[
   ['private-key',/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/g],
   ['github-token',/\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})\b/g],

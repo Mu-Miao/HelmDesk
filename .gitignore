@@ -30,6 +30,7 @@ coverage/
 !/docs/codex-mcp.toml.example
 !/docs/sharing.example.json
 !/docs/v0.1日常使用与验收.md
+!/docs/quickstart.md
 !/docs/公开范围.md
 !/docs/third-party/
 
