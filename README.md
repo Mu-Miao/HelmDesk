@@ -108,7 +108,7 @@ npm run build
 
 ## 界面来源与限制
 
-React 看板包含项目概览、集中验收、Markdown 摘要、折叠差异、时间线及模型/思考深度设置。玻璃导航复用作者博客组件，AeroShards 背景固定于视口；WebGPU 不可用或减少动态效果时降级为静态背景。
+React 看板包含项目概览、集中验收、Markdown 摘要、折叠差异、时间线及模型/思考深度设置。玻璃导航、波纹与碎片等视觉效果的原始来源为 React Bits，部分代码经作者博客中的版本取用并适配；博客不是这些效果的原创来源。AeroShards 背景固定于视口，WebGPU 不可用或减少动态效果时降级为静态背景。
 
 来源与第三方许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。公开源码不改变第三方许可，原创部分未另行指定统一开源许可证；`private: true` 阻止误发布到 npm。
 
