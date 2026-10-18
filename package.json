@@ -1,0 +1,39 @@
+{
+  "name": "helmdesk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "领航台 · 本地 CLI Agent 调度工作台",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "npm run build && node dist/cli.js serve --data-dir .helmdesk",
+    "start": "node dist/cli.js serve",
+    "build": "tsc && vite build",
+    "check": "tsc --noEmit && tsc -p tsconfig.web.json && tsc -p tsconfig.test.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "doctor": "node dist/cli.js doctor",
+    "mcp": "node dist/cli.js mcp",
+    "probe": "node dist/cli.js probe"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@qodercn-ai/qodercn-agent-sdk": "1.0.53",
+    "ajv": "8.20.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "vgpu": "0.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

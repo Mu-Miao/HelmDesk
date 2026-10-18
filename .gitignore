@@ -1,0 +1,40 @@
+# Runtime, credentials and personal host configuration
+.helmdesk/
+.env*
+.aws/
+.codex/
+.agents/
+.qoder/
+connection.json
+sharing.json
+*.sqlite*
+*.db
+*.db-*
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+.DS_Store
+.idea/
+.vscode/
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Only reviewed public docs; keep private development evidence locally
+/docs/*
+!/docs/codex-mcp.toml.example
+!/docs/sharing.example.json
+!/docs/v0.1日常使用与验收.md
+!/docs/公开范围.md
+!/docs/third-party/
+
+# Only portable host setup, publication check and test fixture
+/scripts/*
+!/scripts/register-codex-mcp.mjs
+!/scripts/check-publication.mjs
+!/scripts/fixtures/

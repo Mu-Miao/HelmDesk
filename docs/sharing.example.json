@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "id": "react-best-practices",
+      "path": "/absolute/path/to/react-best-practices",
+      "version": "1.0.0",
+      "approved": false
+    }
+  ],
+  "servers": [
+    {
+      "id": "p3-fixture",
+      "source": "Codex 为本地验收提供的标准 MCP；只读测试服务",
+      "approved": false,
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/HelmDesk/scripts/fixtures/readonly-mcp.mjs"],
+      "readRoots": ["/absolute/path/to/HelmDesk/scripts/fixtures", "/absolute/path/to/HelmDesk/node_modules"],
+      "tools": ["add_numbers"]
+    }
+  ]
+}
