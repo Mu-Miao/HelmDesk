@@ -6,7 +6,7 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 **macOS · Node.js 24+ · TypeScript / React · SQLite · 28 项 MCP 工具**
 
-[快速上手／博客版 Markdown](docs/quickstart.md) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
+[快速上手](docs/quickstart.md) · [博客教程](https://blog.mashutaba.best/post/helmdesk-quickstart) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
 
 ## 它解决什么问题
 
