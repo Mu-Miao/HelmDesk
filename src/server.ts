@@ -80,6 +80,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
         return scheduler.submit({ ...input,agent,maxTurns, model: model.id, modelLabel: model.label, reasoningEffort, capabilityPins });
       }
       case 'task_get': return store.get(id());
+      case 'task_disposition_set':return store.classifyTask(args);
       case 'task_export': return deliveryReport(store.get(id()));
       case 'task_integration_check': {
         const input=integrationSelectionSchema.parse(args),preview=integrationPreview(store.get(input.taskId),store.directory,input.paths);
@@ -122,6 +123,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
     if (req.method === 'GET' && url.pathname === '/api/session') {
       res.setHeader('Set-Cookie', `helmdesk_${port}=${cookie}; HttpOnly; SameSite=Strict; Path=/`); send(res, 200, { csrf }); return;
     }
+    if(req.method==='GET'&&url.pathname==='/favicon.ico'){res.writeHead(204);res.end();return;}
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/assets/'))) {
       const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
       const root = fileURLToPath(new URL('../web/dist/', import.meta.url));

@@ -22,6 +22,7 @@ interface ModelBucket {
 }
 
 interface AcceptedTask {
+  classified:boolean;
   agent:string;
   id: string;
   path: string;
@@ -111,6 +112,7 @@ export function buildProjectSummaries(tasks: ProjectTask[]): ProjectSummary[] {
     seenIds.add(id);
 
     const item: AcceptedTask = {
+      classified:!!task.disposition,
       agent:task.agent??'qoder-cn',
       id,
       path,
@@ -171,8 +173,8 @@ export function buildProjectSummaries(tasks: ProjectTask[]): ProjectSummary[] {
           counts.other += 1;
           break;
       }
-      if (item.state === 'completed' && item.acceptance === 'pending') counts.pendingReview += 1;
-      if (item.acceptance === 'changes_requested') counts.changesRequested += 1;
+      if (!item.classified&&item.state === 'completed' && item.acceptance === 'pending') counts.pendingReview += 1;
+      if (!item.classified&&item.acceptance === 'changes_requested') counts.changesRequested += 1;
 
       const bucketKey=JSON.stringify([item.agent,item.model]);
       let bucket = buckets.get(bucketKey);

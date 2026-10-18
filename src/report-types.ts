@@ -10,6 +10,7 @@ export interface DeliveryReport {
   reasoningEffort:import('./reasoning.js').ReasoningEffort|null; reasoningRun:import('./reasoning.js').ReasoningRun|null;
   revision:{sourceTaskId:string;rootTaskId:string}|null;
   summary: string | null; error: string | null; reviewNote: string | null;
+  disposition?:import('./disposition-types.js').TaskDisposition;
   verification: Task['verification'] | null; usage: Task['usage'] | null;
   dependencies: string[]; acceptanceCriteria: string[];
   inputs: import('./input-types.js').InputRun | null;

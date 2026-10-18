@@ -11,6 +11,7 @@ import {reasoningLabels} from '../../src/reasoning';
 import {IntegrationPanel} from './IntegrationPanel';
 import {revisionFamily} from '../../src/revision-family';
 import {RevisionTrail} from './RevisionTrail';
+import {TaskDisposition} from './TaskDisposition';
 const tabs = ['结果摘要', '时间线', '文件改动', '用量'];
 export function TaskDetail({ task,tasks,onSelect, csrf, agent, onRefresh, onError }: { task: Task;tasks:Task[];onSelect:(id:string)=>void; csrf: string; agent: any; onRefresh: () => Promise<unknown>; onError: (error: string) => void }) {
   const [tab, setTab] = useState('结果摘要'), [events, setEvents] = useState<TaskEvent[]>([]), [cursor, setCursor] = useState(0), [busy, setBusy] = useState(false), [expanded, setExpanded] = useState(false);
@@ -40,6 +41,7 @@ export function TaskDetail({ task,tasks,onSelect, csrf, agent, onRefresh, onErro
   async function cancel() { setBusy(true); try { await tool('task_cancel', { taskId: task.id }, csrf); await onRefresh(); } catch (e: any) { onError(e.message); } finally { setBusy(false); } }
   return <section className="detail" aria-label="任务详情">
     <div className="detail-heading"><h3>{task.title.match(/^P\d+\s/) ? <span className="task-badge">{task.title.split(' ')[0]}</span> : null}{task.title.replace(/^P\d+\s/, '')}</h3><button className="text-button" onClick={() => setExpanded(v => !v)}>{expanded ? '收起详情' : '查看详情'}<Icon name="arrow" size={17}/></button></div>
+    <TaskDisposition task={task} tasks={tasks} onSelect={onSelect} csrf={csrf} onRefresh={onRefresh} onError={onError}/>
     <div className="tabs" role="tablist" aria-label="任务详情类别">{tabs.map(label => <button key={label} role="tab" aria-selected={label === tab} onClick={() => setTab(label)}>{label}</button>)}</div>
     <div role="tabpanel" className="tab-panel">
       {tab === '结果摘要' ? <><ResultSummary text={task.summary || task.error || '任务尚未返回结果。'} error={!!task.error}/><p className="caption">{task.requestedModel.toLowerCase() === 'auto' && (!task.reportedModel || task.reportedModel.toLowerCase() === 'auto') ? 'Auto，实际模型未提供。' : `请求模型：${task.requestedModel} · 服务端报告：${task.reportedModel ?? '未提供'}`}</p></> : null}

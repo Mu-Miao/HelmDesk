@@ -90,6 +90,7 @@ export function deliveryReport(task: Task): DeliveryReport {
     summary: task.summary ?? null,
     error: task.error ?? null,
     reviewNote: task.reviewNote ?? null,
+    ...(task.disposition?{disposition:{...task.disposition}}:{}),
     verification: task.verification
       ? {
           status: task.verification.status,
@@ -182,6 +183,11 @@ export function deliveryReport(task: Task): DeliveryReport {
   push(fence(valueOrUnknown(record.reviewNote)));
   push(`验收状态仍为：${record.acceptance}（${ACCEPTANCE_LABELS[record.acceptance]}），未做任何变更。`);
 
+  if(record.disposition){
+    push('## 历史处理结论');
+    push('处理结论独立于执行、验证与验收；原始状态和错误保留。');
+    push(fence([`历史处理：${({resolved:'已解决',expected_failure:'预期失败',deferred:'暂缓处理'})[record.disposition.status]}`,`原因：${record.disposition.reason}`,`记录时间：${record.disposition.recordedAt}`,...(record.disposition.replacementTaskId?[`后续替代任务：${record.disposition.replacementTaskId}`]:[])].join('\n')));
+  }
   push('## 摘要');
   push(fence(valueOrUnknown(record.summary)));
 

@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import type { Task, Submission, TaskEvent } from './types.js';
 import { safeJson } from './redact.js';
+import {dispositionSchema,validateDisposition} from './task-disposition.js';
 export interface SubmissionReceipt {key:string;hash:string}
 
 export class Store extends EventEmitter {
@@ -17,13 +18,15 @@ export class Store extends EventEmitter {
       CREATE INDEX IF NOT EXISTS events_task ON events(task_id,seq);
       CREATE TABLE IF NOT EXISTS snapshots (kind TEXT PRIMARY KEY, data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS submission_receipts (key TEXT PRIMARY KEY, hash TEXT NOT NULL, task_id TEXT NOT NULL);
-      PRAGMA user_version=2;`);
+      CREATE TABLE IF NOT EXISTS task_dispositions (task_id TEXT PRIMARY KEY, data TEXT NOT NULL);
+      PRAGMA user_version=3;`);
   }
-  list(): Task[] { return (this.db.prepare('SELECT data FROM tasks ORDER BY rowid DESC').all() as { data: string }[]).map(r => JSON.parse(r.data)); }
+  private withDisposition(row:{data:string;disposition?:string|null}):Task {const task=JSON.parse(row.data);return row.disposition?{...task,disposition:JSON.parse(row.disposition)}:task;}
+  list(): Task[] { return (this.db.prepare('SELECT t.data,d.data AS disposition FROM tasks t LEFT JOIN task_dispositions d ON d.task_id=t.id ORDER BY t.rowid DESC').all() as {data:string;disposition:string|null}[]).map(r=>this.withDisposition(r)); }
   get(id: string): Task {
-    const row = this.db.prepare('SELECT data FROM tasks WHERE id=?').get(id) as { data: string } | undefined;
+    const row = this.db.prepare('SELECT t.data,d.data AS disposition FROM tasks t LEFT JOIN task_dispositions d ON d.task_id=t.id WHERE t.id=?').get(id) as {data:string;disposition:string|null}|undefined;
     if (!row) throw new Error('任务不存在');
-    return JSON.parse(row.data);
+    return this.withDisposition(row);
   }
   requestTask(key:string,hash:string):Task|null {
     const row=this.db.prepare('SELECT hash,task_id FROM submission_receipts WHERE key=?').get(key) as {hash:string;task_id:string}|undefined;
@@ -46,11 +49,33 @@ export class Store extends EventEmitter {
     this.emit('change'); return this.get(task.id);
   }
   patch(id: string, patch: Partial<Task>): Task {
-    const task = { ...this.get(id), ...patch, updatedAt: new Date().toISOString() };
+    if(Object.hasOwn(patch,'disposition'))throw Error('处理结论须使用独立的分类接口');
+    const {disposition:_disposition,...original}=this.get(id);
+    const task = { ...original, ...patch, updatedAt: new Date().toISOString() };
     this.db.exec('BEGIN IMMEDIATE');
-    try { this.db.prepare('UPDATE tasks SET data=? WHERE id=?').run(safeJson(task), id); this.insertEvent(id, patch.state ? 'state' : 'update', patch); this.db.exec('COMMIT'); }
+    try {
+      this.db.prepare('UPDATE tasks SET data=? WHERE id=?').run(safeJson(task), id);this.insertEvent(id,patch.state?'state':'update',patch);
+      if(_disposition&&(['state','acceptance','verification'] as const).some(key=>Object.hasOwn(patch,key)&&JSON.stringify(original[key])!==JSON.stringify(patch[key]))){
+        this.db.prepare('DELETE FROM task_dispositions WHERE task_id=?').run(id);
+        this.insertEvent(id,'disposition',{status:'unclassified',reason:'执行、验证或验收发生变化，处理结论需重新核对',recordedAt:new Date().toISOString()});
+      }
+      this.db.exec('COMMIT');
+    }
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
     this.emit('change'); return this.get(id);
+  }
+  classifyTask(args:unknown):Task {
+    const input=dispositionSchema.parse(args),task=this.get(input.taskId);
+    validateDisposition(input,task,input.replacementTaskId?this.get(input.replacementTaskId):undefined);
+    if(task.disposition?.status===input.status&&task.disposition.reason===input.reason&&task.disposition.replacementTaskId===input.replacementTaskId)return task;
+    const record={status:input.status,reason:input.reason,recordedAt:new Date().toISOString(),...(input.replacementTaskId?{replacementTaskId:input.replacementTaskId}:{})};
+    this.db.exec('BEGIN IMMEDIATE');
+    try{
+      if(input.status==='unclassified')this.db.prepare('DELETE FROM task_dispositions WHERE task_id=?').run(task.id);
+      else this.db.prepare('INSERT INTO task_dispositions(task_id,data) VALUES(?,?) ON CONFLICT(task_id) DO UPDATE SET data=excluded.data').run(task.id,safeJson(record));
+      this.insertEvent(task.id,'disposition',record);this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+    this.emit('change');return this.get(task.id);
   }
   private insertEvent(taskId: string, type: string, data: unknown) { this.db.prepare('INSERT INTO events(task_id,type,at,data) VALUES(?,?,?,?)').run(taskId, type, new Date().toISOString(), safeJson(data)); }
   event(taskId: string, type: string, data: unknown) { this.insertEvent(taskId, type, data); this.emit('change'); }

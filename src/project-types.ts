@@ -10,6 +10,7 @@ export interface ProjectSummary {
   models:ProjectModelUsage[];
 }
 export interface ProjectTask {
+  disposition?:import('./disposition-types.js').TaskDisposition;
   agent?:string;
   id:string;projectPath:string;title:string;state:string;acceptance:string;model:string;modelLabel?:string;createdAt:string;updatedAt:string;
   verification?:{status:string};

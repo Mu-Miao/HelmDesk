@@ -20,6 +20,7 @@ export interface Submission {
   timeoutSeconds: number;
 }
 export interface Task extends Submission {
+  disposition?:import('./disposition-types.js').TaskDisposition;
   executionRequested?:boolean;
   reasoningRun?: import('./reasoning.js').ReasoningRun;
   inputRun?: import('./input-types.js').InputRun;

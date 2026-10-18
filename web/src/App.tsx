@@ -25,7 +25,7 @@ export default function App() {
   useLayoutEffect(() => { document.documentElement.dataset.theme = theme; document.documentElement.classList.toggle('dark', theme === 'dark'); try { localStorage.setItem('helmdesk.theme.v1', theme); } catch { /* optional preference */ } }, [theme]);
   const task = data?.tasks.find(item => item.id === selected) ?? data?.tasks[0];
   const running = data?.tasks.filter(task => ['running','preparing'].includes(task.state)).length ?? 0;
-  const pending = data?.tasks.filter(task => task.state === 'completed' && task.acceptance === 'pending').length ?? 0;
+  const pending = data?.tasks.filter(task => task.state === 'completed' && task.acceptance === 'pending'&&!task.disposition).length ?? 0;
   const quota = data?.quota, addOn = quota?.available ? quota.value?.addOnQuota : null;
   const projects=data?.projects??[],filteredProjects=projects.filter(p=>`${p.name} ${p.path}`.toLowerCase().includes(projectSearch.toLowerCase()));
   const reviewCards=(data?.tasks??[]).filter(t=>!reviewProject||t.projectPath===reviewProject).map(buildReviewCard).filter(c=>c.attention!==null);

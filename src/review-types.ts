@@ -6,5 +6,6 @@ export interface ReviewCard {
  attention:Attention|null;summary:string;summaryTruncated:boolean;error:string;errorTruncated:boolean;
  fileCount:number;files:{path:string;kind:string}[];filesTruncated:boolean;
  usage:{taskCredits:number|null;inputTokens:number|null;outputTokens:number|null;usd:number|null};
+ dispositionStatus?:import('./disposition-types.js').DispositionStatus;
 }
 export interface TaskBrief extends ReviewCard {version:string}

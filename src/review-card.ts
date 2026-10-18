@@ -1,5 +1,6 @@
 import type {Attention, ReviewCard} from './review-types.js';
 import type {State, Task} from './types.js';
+import {canClassifyTask} from './disposition-types.js';
 
 const TITLE = 160;
 const MODEL = 200;
@@ -61,7 +62,8 @@ export function buildReviewCard(task: Task): ReviewCard {
     reportedModel,
     reasoningEffort,
     updatedAt: asText(task.updatedAt),
-    attention: attentionOf(task.state, task.acceptance, verification),
+    attention: task.disposition&&canClassifyTask(task) ? null : attentionOf(task.state, task.acceptance, verification),
+    ...(task.disposition?{dispositionStatus:task.disposition.status}:{}),
     summary: summary.text,
     summaryTruncated: summary.truncated,
     error: error.text,
