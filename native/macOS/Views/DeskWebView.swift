@@ -87,15 +87,25 @@ struct DeskWebView: NSViewRepresentable {
             onError("网页进程已结束。请重新连接；后台任务仍由独立服务管理。")
         }
 
+        // WebKit's imported reply isolation differs in the Swift 6.2 and 6.3 SDKs.
+        // Keep exact optional delegate signatures; the coordinator stays on MainActor.
+        #if compiler(>=6.3)
+        typealias AlertReply = @MainActor @Sendable () -> Void
+        typealias ConfirmReply = @MainActor @Sendable (Bool) -> Void
+        #else
+        typealias AlertReply = @Sendable () -> Void
+        typealias ConfirmReply = @Sendable (Bool) -> Void
+        #endif
+
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
-                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable () -> Void) {
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping AlertReply) {
             guard frame.isMainFrame else { completionHandler(); return }
             let alert = NSAlert(); alert.messageText = String(message.prefix(2000)); alert.runModal()
             completionHandler()
         }
 
         func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
-                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping @MainActor @Sendable (Bool) -> Void) {
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ConfirmReply) {
             guard frame.isMainFrame else { completionHandler(false); return }
             let alert = NSAlert(); alert.messageText = String(message.prefix(2000))
             alert.addButton(withTitle: "确认"); alert.addButton(withTitle: "取消")
