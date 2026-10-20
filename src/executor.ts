@@ -37,6 +37,16 @@ export class QoderExecutor implements Executor {
     if(existsSync(authentication)) symlinkSync(realpathSync(authentication),join(run.configDirectory,'.auth'),'dir');
     run.authentication={mode:'read-only-existing-login',verified:await verifyAuthenticationReference(join(this.dataDir,'tasks',task.id),authentication,join(run.configDirectory,'.auth'),this.sharing.roots())};
     if(!run.authentication.verified) throw new Error('现有登录的只读引用验证失败；拒绝启动执行者');
+    // Custom model IDs are resolved from the official per-user model registry.
+    // Reference it read-only; never copy or inspect provider credentials here.
+    if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(task.model)) {
+      const models = join(loginRoot, '.models');
+      if (!existsSync(models)) throw new Error('官方自定义模型目录不存在');
+      const source = realpathSync(models), alias = join(run.configDirectory, '.models');
+      symlinkSync(source, alias, 'dir');
+      if (!await verifyInputIsolation(join(this.dataDir,'tasks',task.id), [source], [], this.sharing.roots())) throw new Error('自定义模型目录只读隔离未验证');
+      run.modelConfiguration = { mode: 'read-only-existing-models', verified: true };
+    }
     return {capabilityRun:run,...await this.prepareInputs(task)};
   }
   async finalize(task:Task):Promise<Partial<Task>> {const run=await this.sharing?.close(task.id);return run?{capabilityRun:run}:{};}
@@ -56,6 +66,7 @@ export class QoderExecutor implements Executor {
     writeFileSync(specFile, JSON.stringify({ prompt: task.prompt, cwd: task.workspace, runtime: runtime.path, model: task.model, maxTurns:task.maxTurns,reasoningEffort:task.reasoningEffort, mode: task.mode, allowedFiles: task.allowedFiles, gateway, inputs:task.inputRun?.files, configDirectory:task.capabilityRun?.configDirectory }), { mode: 0o600 });
     const worker = fileURLToPath(new URL('./worker.js', import.meta.url));
     const readOnlyRoots=this.sharing?[join(directory,'capabilities'),join(task.capabilityRun!.configDirectory!,'.auth')]:[];
+    if(task.capabilityRun?.modelConfiguration) readOnlyRoots.push(join(task.capabilityRun.configDirectory!,'.models'));
     readOnlyRoots.push(...inputRoots(task,this.dataDir));
     const child: ChildProcess = spawn('/usr/bin/sandbox-exec', ['-p', sandboxProfile(directory,this.sharing?.roots(),readOnlyRoots), process.execPath, worker, specFile], {
       cwd: task.workspace, detached: true, stdio: ['ignore', 'pipe', 'pipe'],

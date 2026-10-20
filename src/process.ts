@@ -5,17 +5,30 @@ export interface GroupCleanup {status:'signalled'|'absent'|'zombies_only';member
 export function parseProcessGroups(output:string):GroupMember[]{
   return output.split(/\r?\n/).filter(line=>line.trim()).map(line=>{
     const match=/^\s*(\d+)\s+(\d+)\s+([A-Za-z+<>=\-]+)\s*$/.exec(line);
-    if(!match)throw Error('进程快照格式无法确认');
+    if(!match)throw Error(`进程快照格式无法确认（pid/pgid/stat）：${JSON.stringify(line.slice(0,120))}`);
     const pid=Number(match[1]),pgid=Number(match[2]);
     if(!Number.isSafeInteger(pid)||pid<0||!Number.isSafeInteger(pgid)||pgid<0)throw Error('进程快照编号无效');
     return{pid,pgid,state:match[3]!};
   });
 }
-function inspectGroups(){
-  return parseProcessGroups(execFileSync('/bin/ps',['-axo','pid=,pgid=,stat='],{encoding:'utf8',timeout:2000,maxBuffer:4_000_000}));
+export function inspectOwnedGroup(pgid:number){
+  if(!Number.isSafeInteger(pgid)||pgid<=1)throw Error('进程组编号无效');
+  let output:string;
+  try {
+    // Query only the owned group. An unrelated process in transition must not
+    // decide whether this group has executable members. Keep parsing strict.
+    output=execFileSync('/bin/ps',['-g',String(pgid),'-o','pid=,pgid=,stat='],{encoding:'utf8',timeout:2000,maxBuffer:4_000_000,env:{...process.env,LC_ALL:'C',COMMAND_MODE:'unix2003'}});
+  } catch(error:any) {
+    // ps exits 1 for an empty selection; other failures remain unconfirmed.
+    if(error.status===1&&typeof error.stdout==='string'&&!error.stdout.trim()&&typeof error.stderr==='string'&&!error.stderr.trim())return [];
+    throw error;
+  }
+  const members=parseProcessGroups(output);
+  if(members.some(member=>member.pgid!==pgid))throw Error('进程快照包含未请求的进程组');
+  return members;
 }
 // Only call for detached process groups created and owned by HelmDesk.
-export function killOwnedGroup(pid: number | undefined,inspect=inspectGroups):GroupCleanup {
+export function killOwnedGroup(pid: number | undefined,inspect=()=>inspectOwnedGroup(pid!)):GroupCleanup {
   if (!pid || !Number.isSafeInteger(pid) || pid <= 1) return{status:'absent',members:[]};
   try { process.kill(-pid, 'SIGKILL');return{status:'signalled',members:[]}; }
   catch (error: any) {

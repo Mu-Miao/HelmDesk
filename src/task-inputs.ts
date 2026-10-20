@@ -2,6 +2,7 @@ import {constants,openSync,closeSync,fstatSync,readSync,lstatSync,realpathSync,m
 import {join,resolve,sep,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import type {Task} from './types.js';
+import {assertDeliveryVersion,assertVerifiedDelivery} from './verified-delivery.js';
 import type {InputFile,InputSelection} from './input-types.js';
 import {INPUT_DIRECTORY} from './input-types.js';
 import {inputPlan} from './input-policy.js';
@@ -35,6 +36,7 @@ export function stageInputs(selections:InputSelection[],lookup:(id:string)=>Task
   const plan=inputPlan(selections,lookup),root=realpathSync(dataDir);
   return plan.map(file=>{
     const task=lookup(file.taskId),expected=join(root,'tasks',task.id,'workspace');
+    try {assertVerifiedDelivery(task,dataDir);}catch(error){throw Error(`来源工作目录或交付校验未通过：${(error as Error).message}`);}
     if(!task.workspace||realpathSync(task.workspace)!==expected) throw new Error('来源工作目录不属于任务，拒绝交接');
     return {file,content:readChecked(expected,file.path,file)};
   });
@@ -50,6 +52,9 @@ export function inputRoots(task:Task,dataDir:string):string[] {
 }
 export function validateInputSources(task:Task,lookup:(id:string)=>Task) {
   if(!task.inputRun?.files.length)return;
+  for(const source of new Set(task.inputRun.files.map(file=>file.taskId))) {
+    try {assertDeliveryVersion(lookup(source));}catch(error){throw Error(`来源校验未通过：${(error as Error).message}`);}
+  }
   const pinned=task.inputRun.files,current=inputPlan(task.inputs??[],lookup);
   if(current.length!==pinned.length||current.some(f=>!pinned.some(p=>p.taskId===f.taskId&&p.path===f.path&&p.sha256===f.sha256&&p.bytes===f.bytes)))throw new Error('来源交付记录与固定输入快照不一致，拒绝启动');
 }

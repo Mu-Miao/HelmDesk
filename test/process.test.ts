@@ -5,7 +5,31 @@ import { mkdtempSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { killOwnedGroup } from '../src/process.js';
-import {parseProcessGroups} from '../src/process.js';
+import {parseProcessGroups,inspectOwnedGroup,watchOwnedProcess} from '../src/process.js';
+import {sandboxProfile} from '../src/isolation.js';
+
+test('sandboxed detached execution confirms timeout cleanup of its own real process tree',{skip:process.platform!=='darwin',timeout:5000},async()=>{
+  const root=mkdtempSync(join(tmpdir(),'helm-sandbox-timeout-'));
+  const program='require("child_process").spawn(process.execPath,["-e","setTimeout(()=>{},10000)"],{stdio:"ignore"});console.log("ready");setTimeout(()=>{},10000)';
+  const child=spawn('/usr/bin/sandbox-exec',['-p',sandboxProfile(root),process.execPath,'-e',program],{detached:true,stdio:['ignore','pipe','pipe']});
+  const errors:Error[]=[],execution=watchOwnedProcess(child,error=>errors.push(error));
+  try{
+    await new Promise<void>((resolve,reject)=>{child.stdout.once('data',()=>resolve());child.once('error',reject);});
+    assert.equal(execution.cancel().confirmed,true);await execution.finished;
+    assert.equal(errors.length,0);assert.ok(inspectOwnedGroup(child.pid!).every(member=>member.state.startsWith('Z')));
+  }finally{killOwnedGroup(child.pid);rmSync(root,{recursive:true,force:true});}
+});
+
+test('fresh OS inspection selects only an owned detached group and handles an absent group',async()=>{
+  const child=spawn(process.execPath,['-e','console.log("ready");setTimeout(()=>{},10000)'],{detached:true,stdio:['ignore','pipe','pipe']});
+  try{
+    await new Promise<void>((resolve,reject)=>{child.stdout.once('data',()=>resolve());child.once('error',reject);});
+    const members=inspectOwnedGroup(child.pid!);assert.ok(members.some(member=>member.pid===child.pid));assert.ok(members.every(member=>member.pgid===child.pid));
+    const closed=new Promise(resolve=>child.once('close',resolve));killOwnedGroup(child.pid);await closed;
+    assert.deepEqual(inspectOwnedGroup(child.pid!),[]);
+    for(const value of [0,1,-1,NaN])assert.throws(()=>inspectOwnedGroup(value));
+  }finally{killOwnedGroup(child.pid);}
+});
 
 test('OS process snapshots require complete parseable pid/group/state rows',()=>{
   assert.deepEqual(parseProcessGroups(' 12 12 Z+\n 13 12 S\n'),[{pid:12,pgid:12,state:'Z+'},{pid:13,pgid:12,state:'S'}]);

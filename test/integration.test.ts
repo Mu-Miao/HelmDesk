@@ -9,6 +9,7 @@ import {integrationPreview,integrationPatch} from '../src/integration.js';
 import {safeJson} from '../src/redact.js';
 import {runCommand} from '../src/qoder.js';
 import type {Task} from '../src/types.js';
+import {deliveryVersion} from '../src/verified-delivery.js';
 
 function fixture(base:Record<string,string|Buffer>={'edit.txt':'old\n','delete.txt':'remove\n'},outputs:Record<string,string|Buffer|null>={'edit.txt':'new\n','delete.txt':null,'added.txt':'hello\n'}){
   const root=mkdtempSync(join(tmpdir(),'helmdesk-integration-')),project=join(root,'project'),data=join(root,'data'),id=randomUUID(),workspace=join(data,'tasks',id,'workspace');
@@ -18,6 +19,7 @@ function fixture(base:Record<string,string|Buffer>={'edit.txt':'old\n','delete.t
   const before=inventory(project);cpSync(project,workspace,{recursive:true});
   for(const [path,bytes]of Object.entries(outputs)){if(bytes===null)unlinkSync(join(workspace,path));else put(workspace,path,bytes);}
   const task:Task={id,title:'integration fixture',prompt:'fixture',model:'Auto',requestedModel:'Auto',projectPath:project,workspace,baseline:'copy:fixture',workspaceKind:'copy',state:'completed',acceptance:'accepted',createdAt:'2026-10-17T00:00:00Z',updatedAt:'2026-10-17T00:00:01Z',mode:'files',allowedFiles:[...new Set([...Object.keys(base),...Object.keys(outputs)])],dependencies:[],acceptanceCriteria:['fixture'],timeoutSeconds:10,verification:{status:'passed',command:'fixture',evidence:'checked',recordedAt:'2026-10-17T00:00:01Z'},changes:collectChanges(workspace,before,[...new Set([...Object.keys(base),...Object.keys(outputs)])])};
+  task.verification!.deliveryVersion=deliveryVersion(task);
   return {root,project,data,workspace,task,before,put,close(){rmSync(root,{recursive:true,force:true});}};
 }
 test('only completed, verified and accepted files qualify; reads do not alter task or original bytes',()=>{
@@ -50,14 +52,14 @@ test('changed delivered bytes, missing outputs and reappearing deleted outputs f
   const f=fixture();try{unlinkSync(join(f.workspace,'edit.txt'));assert.equal(integrationPreview(f.task,f.data,['edit.txt']).files[0]?.status,'blocked');}finally{f.close();}
 });
 test('legacy modifications need original baselines; stored truncated display is never used to build a patch',()=>{
-  const f=fixture();try{const edit=f.task.changes!.find(c=>c.path==='edit.txt')!;assert.equal(edit.beforeBytes,4);assert.match(edit.beforeSha256!,/^[a-f0-9]{64}$/);delete edit.beforeSha256;assert.match(integrationPreview(f.task,f.data,['edit.txt']).files[0]?.reason??'',/缺少完整原始基线/);
-    const added=f.task.changes!.find(c=>c.path==='added.txt')!;added.diff='[显示已截断] unrelated text';const p=integrationPreview(f.task,f.data,['added.txt']),patch=integrationPatch(f.task,f.data,['added.txt'],p.fingerprint).patch;assert.ok(patch.includes('+hello'));assert.ok(!patch.includes('unrelated'));delete added.sha256;assert.equal(integrationPreview(f.task,f.data,['added.txt']).canExport,false);
+  const f=fixture();try{const edit=f.task.changes!.find(c=>c.path==='edit.txt')!;assert.equal(edit.beforeBytes,4);assert.match(edit.beforeSha256!,/^[a-f0-9]{64}$/);delete edit.beforeSha256;f.task.verification!.deliveryVersion=deliveryVersion(f.task);assert.match(integrationPreview(f.task,f.data,['edit.txt']).files[0]?.reason??'',/缺少完整原始基线/);
+    const added=f.task.changes!.find(c=>c.path==='added.txt')!;added.diff='[显示已截断] unrelated text';f.task.verification!.deliveryVersion=deliveryVersion(f.task);const p=integrationPreview(f.task,f.data,['added.txt']),patch=integrationPatch(f.task,f.data,['added.txt'],p.fingerprint).patch;assert.ok(patch.includes('+hello'));assert.ok(!patch.includes('unrelated'));delete added.sha256;f.task.verification!.deliveryVersion=deliveryVersion(f.task);assert.equal(integrationPreview(f.task,f.data,['added.txt']).canExport,false);
   }finally{f.close();}
 });
 test('traversal, reserved/control paths, unrecorded selections and excessive/duplicate selection are rejected before IO',()=>{
   const f=fixture();try{for(const path of ['../outside','/absolute','a\\b','a//b','a/./b','.codex/x','.env.test','.helmdesk-inputs/a','x\ny','x\ty'])assert.throws(()=>integrationPreview(f.task,f.data,[path]));
     assert.throws(()=>integrationPreview(f.task,f.data,['unknown.txt']));assert.throws(()=>integrationPreview(f.task,f.data,['added.txt','added.txt']));assert.throws(()=>integrationPreview(f.task,f.data,Array.from({length:21},(_,i)=>`f${i}`)));
-    f.task.allowedFiles=[];assert.throws(()=>integrationPreview(f.task,f.data,['added.txt']),/允许范围/);
+    f.task.allowedFiles=[];f.task.verification!.deliveryVersion=deliveryVersion(f.task);assert.throws(()=>integrationPreview(f.task,f.data,['added.txt']),/允许范围/);
   }finally{f.close();}
 });
 test('symlink roots/leaves/parents, foreign workspaces and hard-linked outputs cannot be read as accepted content',()=>{
@@ -66,7 +68,7 @@ test('symlink roots/leaves/parents, foreign workspaces and hard-linked outputs c
   }finally{f.close();}
   const parent=fixture({}, {'sub/file.txt':'ok'});try{symlinkSync(parent.workspace,join(parent.project,'sub'));assert.match(integrationPreview(parent.task,parent.data).files[0]?.reason??'',/符号链接/);}finally{parent.close();}
   const hard=fixture();try{linkSync(join(hard.workspace,'added.txt'),join(hard.root,'hard'));assert.match(integrationPreview(hard.task,hard.data,['added.txt']).files[0]?.reason??'',/单链接/);}finally{hard.close();}
-  const root=fixture();try{const alias=join(root.root,'alias');symlinkSync(root.project,alias);root.task.projectPath=alias;assert.equal(integrationPreview(root.task,root.data).canExport,false);}finally{root.close();}
+  const root=fixture();try{const alias=join(root.root,'alias');symlinkSync(root.project,alias);root.task.projectPath=alias;root.task.verification!.deliveryVersion=deliveryVersion(root.task);assert.equal(integrationPreview(root.task,root.data).canExport,false);}finally{root.close();}
 });
 test('binary, invalid UTF-8, executable, oversize and redaction-changing text refuse patch export',()=>{
   for(const bytes of [Buffer.from([0,1,2]),Buffer.from([255,254,250]),Buffer.from('Authorization: Bearer abc123'),Buffer.alloc(1_000_001,97)]){

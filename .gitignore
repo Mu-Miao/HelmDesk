@@ -18,12 +18,18 @@ sharing.json
 .DS_Store
 .idea/
 .vscode/
+.serena/
+/macOS与iOS应用开发规划书.md
 
 # Dependencies and generated output
 node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
 
 # Only reviewed public docs; keep private development evidence locally
 /docs/*
@@ -31,6 +37,9 @@ coverage/
 !/docs/sharing.example.json
 !/docs/v0.1日常使用与验收.md
 !/docs/quickstart.md
+!/docs/macos-install.md
+!/docs/macos-roadmap.md
+!/docs/release-checklist.md
 !/docs/公开范围.md
 !/docs/third-party/
 
@@ -38,4 +47,5 @@ coverage/
 /scripts/*
 !/scripts/register-codex-mcp.mjs
 !/scripts/check-publication.mjs
+!/scripts/audit-macos-bundle.mjs
 !/scripts/fixtures/

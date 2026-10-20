@@ -1,3 +1,4 @@
+import {deliveryVersion} from '../src/verified-delivery.js';
 import{test}from'node:test';
 import assert from'node:assert/strict';
 import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,unlinkSync,renameSync,chmodSync,existsSync}from'node:fs';
@@ -18,6 +19,7 @@ function fixture(){
  const store=new Store(data);const submission:Submission={title:'source',prompt:'fixture',projectPath:project,allowedFiles:['result.txt'],acceptanceCriteria:['fixture'],dependencies:[],model:'fixture',mode:'files',timeoutSeconds:10};
  const parent=store.create(submission),workspace=join(data,'tasks',parent.id,'workspace');mkdirSync(workspace,{recursive:true});const content=Buffer.from('DELIVERY\n'),sha256=createHash('sha256').update(content).digest('hex');writeFileSync(join(workspace,'result.txt'),content);
  store.patch(parent.id,{workspace,state:'completed',acceptance:'accepted',verification:{status:'passed',command:'fixture',evidence:'ok',recordedAt:new Date().toISOString()},changes:[{path:'result.txt',kind:'added',diff:'+DELIVERY',sha256,bytes:content.length}]});
+ store.patch(parent.id,{verification:{...store.get(parent.id).verification!,deliveryVersion:deliveryVersion(store.get(parent.id))}});
  return{root,data,project,store,submission,parent:store.get(parent.id),content,selection:[{taskId:parent.id,paths:['result.txt']}],close(){store.close();rmSync(root,{recursive:true,force:true});}};
 }
 function child(f:ReturnType<typeof fixture>):Task{const task=f.store.create({...f.submission,title:'consumer'});const workspace=join(f.data,'tasks',task.id,'workspace');mkdirSync(workspace,{recursive:true});return f.store.patch(task.id,{workspace});}
@@ -38,7 +40,7 @@ test('changed source bytes, symlink files/ancestors and foreign workspaces canno
   const source=join(f.parent.workspace!,'result.txt');writeFileSync(source,'MUTATION');assert.throws(()=>stageInputs(f.selection,id=>f.store.get(id),f.data),/大小|摘要/);writeFileSync(source,f.content);
   const other=join(f.root,'outside.txt');writeFileSync(other,f.content);unlinkSync(source);symlinkSync(other,source);assert.throws(()=>stageInputs(f.selection,id=>f.store.get(id),f.data),/符号链接/);
   assert.throws(()=>stageInputs(f.selection,()=>({...f.parent,workspace:f.project}),f.data),/来源工作目录/);
-  unlinkSync(source);mkdirSync(join(f.parent.workspace!,'folder'));writeFileSync(join(f.parent.workspace!,'folder','nested.txt'),f.content);const nested={...f.parent,changes:[{...f.parent.changes![0]!,path:'folder/nested.txt'}]};renameSync(join(f.parent.workspace!,'folder'),join(f.root,'folder'));symlinkSync(join(f.root,'folder'),join(f.parent.workspace!,'folder'));assert.throws(()=>stageInputs([{taskId:f.parent.id,paths:['folder/nested.txt']}],()=>nested,f.data),/符号链接/);
+  unlinkSync(source);mkdirSync(join(f.parent.workspace!,'folder'));writeFileSync(join(f.parent.workspace!,'folder','nested.txt'),f.content);const nested={...f.parent,changes:[{...f.parent.changes![0]!,path:'folder/nested.txt'}]};nested.verification={...nested.verification!,deliveryVersion:deliveryVersion(nested)};renameSync(join(f.parent.workspace!,'folder'),join(f.root,'folder'));symlinkSync(join(f.root,'folder'),join(f.parent.workspace!,'folder'));assert.throws(()=>stageInputs([{taskId:f.parent.id,paths:['folder/nested.txt']}],()=>nested,f.data),/符号链接/);
  }finally{f.close();}
 });
 
@@ -89,6 +91,7 @@ test('unsafe paths are rejected even when otherwise valid source metadata record
 test('empty and binary files preserve exact bytes through pinning and mount',()=>{
  const f=fixture();try{for(const content of [Buffer.alloc(0),Buffer.from([0,255,13,10,128])]){
   writeFileSync(join(f.parent.workspace!,'result.txt'),content);f.store.patch(f.parent.id,{changes:[{path:'result.txt',kind:'modified',diff:'binary fixture',sha256:createHash('sha256').update(content).digest('hex'),bytes:content.length}]});
+  f.store.patch(f.parent.id,{verification:{...f.store.get(f.parent.id).verification!,deliveryVersion:deliveryVersion(f.store.get(f.parent.id))}});
   const t=child(f),inputRun=pinInputs(t.id,stageInputs(f.selection,id=>f.store.get(id),f.data),f.data)!,task={...t,inputRun};materializeInputs(task,f.data);assert.deepEqual(readFileSync(join(t.workspace!,inputRun.files[0]!.mountedPath)),content);assert.equal(auditInputs(task,f.data)?.integrity,'verified');
  }}finally{f.close();}
 });

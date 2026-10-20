@@ -45,7 +45,7 @@ node dist/cli.js doctor --data-dir .helmdesk
 node dist/cli.js serve --data-dir .helmdesk --concurrency 2
 ```
 
-保留这个终端，浏览器打开 [http://127.0.0.1:4317/](http://127.0.0.1:4317/)。服务只监听本机，示例明确启用两个槽位；默认一个，最大两个。看板用于查看和审核，任务从 MCP 宿主派发。
+保留服务终端，另开交互终端运行 `node dist/cli.js browser --data-dir .helmdesk`，在 60 秒内打开生成的一次性入口。Mac 应用可直接点击“浏览器”。服务只监听本机，示例明确启用两个槽位；默认一个，最大两个。看板用于查看和审核，任务从 MCP 宿主派发。
 
 ## 2. 把 MCP 接进 Codex
 

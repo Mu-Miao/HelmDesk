@@ -12,6 +12,8 @@ import {stageInputs,pinInputs,materializeInputs,auditInputs,validateInputSources
 import {resolveReasoningEffort} from './reasoning.js';
 import {taskBudget} from './execution-policy.js';
 import {validateOllamaTask} from './ollama-executor.js';
+import {deliveryVersion,assertDeliveryVersion,assertVerifiedDelivery} from './verified-delivery.js';
+import {protectedDirectoryNames} from './protected-paths.js';
 
 interface ActiveTask { id:string; execution?:Execution; cancelled:boolean }
 
@@ -19,15 +21,21 @@ export class Scheduler {
   private readonly active=new Map<string,ActiveTask>();
   private pumpQueued=false;
   private stopped = false;
-  constructor(readonly store: Store, readonly executor: Executor, private readonly allowedRoots = process.env.HELMDESK_PROJECT_ROOTS?.split(delimiter).map(p => realpathSync(p)) ?? [realpathSync(process.cwd()), join(store.directory, 'probe-project')], readonly concurrency=1) {
+  private refusingSubmissions = false;
+  constructor(readonly store: Store, readonly executor: Executor, private allowedRoots = process.env.HELMDESK_PROJECT_ROOTS?.split(delimiter).map(p => realpathSync(p)) ?? [realpathSync(process.cwd()), join(store.directory, 'probe-project')], readonly concurrency=1) {
     if(!Number.isInteger(concurrency)||concurrency<1||concurrency>2) throw new Error('并发数必须为 1 或 2');
   }
   queue() {
     const tasks=this.store.list().reverse(),report=queueReport(tasks,new Set(this.active.keys()),this.concurrency);
     for(const entry of report.entries){const task=tasks.find(t=>t.id===entry.taskId)!,decision=taskBudget(this.store,task);if(decision&&!decision.allowed){entry.blockers.push({taskId:task.id,code:'budget',reason:decision.reason});entry.ready=false;}}
+    for(const entry of report.entries)for(const id of tasks.find(task=>task.id===entry.taskId)!.dependencies) {
+      const source=tasks.find(task=>task.id===id);
+      if(source?.state==='completed'&&source.acceptance==='accepted')try{assertDeliveryVersion(source);}catch{entry.blockers.push({taskId:id,code:'awaiting_acceptance',reason:'依赖交付需要当前版本的宿主验证'});entry.ready=false;}
+    }
     report.ready=report.entries.filter(e=>e.ready).length;report.blocked=report.entries.length-report.ready;return report;
   }
   submit(input: Submission,receipt?:SubmissionReceipt): Task {
+    if(this.refusingSubmissions)throw Error('执行端正在停止，拒绝新的派发');
     const previous=receipt?this.store.requestTask(receipt.key,receipt.hash):null;
     if(previous)return previous;
     if(input.agent==='ollama')validateOllamaTask(input as Task);
@@ -35,7 +43,7 @@ export class Scheduler {
     if (!isAbsolute(input.projectPath) || !statSync(input.projectPath).isDirectory()) throw new Error('项目路径必须是存在的绝对目录');
     input = { ...input, projectPath: realpathSync(input.projectPath) };
     if (!this.allowedRoots.some(value => { const root = existsSync(value) ? realpathSync(value) : resolve(value); return input.projectPath === root || input.projectPath.startsWith(root + sep); })) throw new Error('项目路径不在领航台启动时允许的根目录中；请通过 HELMDESK_PROJECT_ROOTS 明确配置');
-    if (input.projectPath.split(sep).some(p => ['.codex', '.aws', '.qoder-cn', '.qoderworkcn', '.ssh', '.agents'].includes(p))) throw new Error('禁止把配置或凭据目录作为任务项目');
+    if (input.projectPath.split(sep).some(p => protectedDirectoryNames.has(p.toLowerCase()))) throw new Error('禁止把配置或凭据目录作为任务项目');
     validateScope(input.allowedFiles);
     if (input.mode === 'files' && input.allowedFiles.length === 0) throw new Error('文件任务必须指定允许修改的文件范围');
     if (input.dependencies.length !== new Set(input.dependencies).size) throw new Error('依赖任务重复');
@@ -79,6 +87,7 @@ export class Scheduler {
       if(this.executor.prepare) this.store.patch(task.id,await this.executor.prepare(this.store.get(task.id)));
       if (active.cancelled) return;
       validateInputSources(this.store.get(task.id),id=>this.store.get(id));
+      for(const id of task.dependencies)assertVerifiedDelivery(this.store.get(id),this.store.directory);
       const budget=taskBudget(this.store,this.store.get(task.id));
       if(budget&&!budget.allowed){this.store.patch(task.id,{state:'waiting_user',failureKind:'budget',error:budget.reason});return;}
       this.store.patch(task.id,{executionRequested:true});
@@ -136,13 +145,14 @@ export class Scheduler {
   review(id: string, acceptance: Task['acceptance'], note: string) {
     const task = this.store.get(id);
     if (task.state !== 'completed') throw new Error('仅执行完成的任务可以验收');
-    if (acceptance === 'accepted' && task.verification?.status === 'failed') throw new Error('验证失败的任务不能验收通过');
+    if(acceptance==='accepted'&&task.verification?.status==='failed')throw Error('验证失败的任务不能验收通过');
+    if (acceptance === 'accepted') assertVerifiedDelivery(task,this.store.directory);
     const updated = this.store.patch(id, { acceptance, reviewNote: note }); this.kick(); return updated;
   }
-  verifyTask(id: string, input: Omit<NonNullable<Task['verification']>, 'recordedAt'>) {
+  verifyTask(id: string, input: Pick<NonNullable<Task['verification']>, 'status' | 'command' | 'evidence'>) {
     const task = this.store.get(id);
     if (task.state !== 'completed') throw new Error('仅执行完成的任务可以记录交付验证');
-    const updated=this.store.patch(id, { verification: { ...input, recordedAt: new Date().toISOString() }, ...(input.status === 'failed' ? { acceptance: 'changes_requested' as const } : {}) });
+    const updated=this.store.patch(id, { verification: { ...input, recordedAt: new Date().toISOString(),...(input.status==='passed'?{deliveryVersion:deliveryVersion(task)}:{}) }, ...(input.status === 'failed' ? { acceptance: 'changes_requested' as const } : {}) });
     this.kick();return updated;
   }
   async wait(id: string, after: number, timeoutMs: number) {
@@ -154,4 +164,6 @@ export class Scheduler {
     }
   }
   stop() { this.stopped = true; for(const id of this.active.keys()) this.cancel(id); }
+  setAllowedRoots(roots:string[]) { this.allowedRoots=[...roots]; }
+  beginShutdown() {this.refusingSubmissions=true;this.stop();}
 }

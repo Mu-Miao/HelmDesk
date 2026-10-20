@@ -97,6 +97,7 @@ export function deliveryReport(task: Task): DeliveryReport {
           command: task.verification.command,
           evidence: task.verification.evidence,
           recordedAt: task.verification.recordedAt,
+          ...(task.verification.deliveryVersion?{deliveryVersion:task.verification.deliveryVersion}:{}),
         }
       : null,
     usage: task.usage
@@ -174,6 +175,7 @@ export function deliveryReport(task: Task): DeliveryReport {
           `验证命令：${record.verification.command}`,
           `验证证据：${record.verification.evidence}`,
           `记录时间：${record.verification.recordedAt}`,
+          ...(record.verification.deliveryVersion?[`交付版本 SHA256：${record.verification.deliveryVersion}`]:['历史验证未绑定交付版本；再次整合或交接前需宿主重新验证。']),
         ].join('\n'))
       : fence('未记录验证。'),
   );

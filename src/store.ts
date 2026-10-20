@@ -5,21 +5,14 @@ import { join } from 'node:path';
 import type { Task, Submission, TaskEvent } from './types.js';
 import { safeJson } from './redact.js';
 import {dispositionSchema,validateDisposition} from './task-disposition.js';
+import {openDataDatabase} from './data-maintenance.js';
 export interface SubmissionReceipt {key:string;hash:string}
 
 export class Store extends EventEmitter {
   readonly db: DatabaseSync;
   constructor(readonly directory: string) {
     super();
-    this.db = new DatabaseSync(join(directory, 'helmdesk.sqlite'));
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
-      CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, data TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, type TEXT NOT NULL, at TEXT NOT NULL, data TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS events_task ON events(task_id,seq);
-      CREATE TABLE IF NOT EXISTS snapshots (kind TEXT PRIMARY KEY, data TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS submission_receipts (key TEXT PRIMARY KEY, hash TEXT NOT NULL, task_id TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS task_dispositions (task_id TEXT PRIMARY KEY, data TEXT NOT NULL);
-      PRAGMA user_version=3;`);
+    this.db = openDataDatabase(directory);
   }
   private withDisposition(row:{data:string;disposition?:string|null}):Task {const task=JSON.parse(row.data);return row.disposition?{...task,disposition:JSON.parse(row.disposition)}:task;}
   list(): Task[] { return (this.db.prepare('SELECT t.data,d.data AS disposition FROM tasks t LEFT JOIN task_dispositions d ON d.task_id=t.id ORDER BY t.rowid DESC').all() as {data:string;disposition:string|null}[]).map(r=>this.withDisposition(r)); }

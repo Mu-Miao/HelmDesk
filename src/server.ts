@@ -20,14 +20,19 @@ import {revisionFamily} from './revision-family.js';
 import {agentCatalog,agentModels,AgentExecutor} from './agents.js';
 import {executionPolicy,policyView} from './execution-policy.js';
 import {modelCompatibility} from './model-compatibility.js';
+import { appIdentity, type AppIdentity } from './app-runtime.js';
+import {DesktopService} from './desktop-service.js';
+import {desktopConfiguration} from './desktop-config.js';
+import {BrowserTickets,BrowserSessions} from './browser-session.js';
 
 import {briefSchema,taskBrief,briefPage,watchBriefs} from './review.js';
 export function sameSecret(actual: string | undefined, expected: string) {
   const a = Buffer.from(actual ?? ''), b = Buffer.from(expected); return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp(store: Store, scheduler: Scheduler, port: number, token: string, discoverModels = listModels, sharing = new Sharing(store,`http://127.0.0.1:${port}`)) {
+export function createApp(store: Store, scheduler: Scheduler, port: number, token: string, discoverModels = listModels, sharing = new Sharing(store,`http://127.0.0.1:${port}`), identity: AppIdentity = appIdentity(store.directory, port), stop?:()=>void) {
+  const desktop=new DesktopService(store,scheduler,stop,port);
   const discoverFor=async(agent:import('./agent-types.js').AgentId)=>{const catalog=await(agent==='qoder-cn'?discoverModels():agentModels(agent));return{...catalog,options:agent==='qoder-cn'?modelCompatibility(catalog.options,store.list()):catalog.options};};
-  const csrf = randomBytes(32).toString('hex'), cookie = randomBytes(32).toString('hex');
+  const browserTickets = new BrowserTickets(), browserSessions = new BrowserSessions();
   const hostname = `127.0.0.1:${port}`, origin = `http://${hostname}`;
   async function execute(name: string, args: any): Promise<unknown> {
     const id = () => idSchema.parse(args.taskId);
@@ -69,6 +74,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       case 'queue_get': return scheduler.queue();
       case 'task_submit': {
         const input = submissionSchema.parse(args);
+        const configurationRevision=desktopConfiguration(store.directory).revision;
         const preference = modelPreference(store);
         const agent=input.agent??preference.agent??'qoder-cn',catalog=await discoverFor(agent);
         const requested=input.model??(agent===(preference.agent??'qoder-cn')?preference.model:undefined);if(!requested)throw Error('指定其他执行器时须明确选择模型');
@@ -77,6 +83,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
         const maxTurns=input.maxTurns??(agent==='ollama'?1:executionPolicy(store).maxTurns);
         if(input.mode==='probe'&&(input.capabilities?.skills.length||input.capabilities?.tools.length)) throw new Error('禁用工具的探测任务不能共享能力');
         const capabilityPins=await sharing.select(input.capabilities??{skills:[],tools:[]});
+        if(configurationRevision!==desktopConfiguration(store.directory).revision)throw Error('执行设置在派发准备期间变化，请重新确认后派发');
         return scheduler.submit({ ...input,agent,maxTurns, model: model.id, modelLabel: model.label, reasoningEffort, capabilityPins });
       }
       case 'task_get': return store.get(id());
@@ -118,10 +125,29 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       try {let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>20000) throw new Error('网关请求过大');}send(res,200,await sharing.dispatch(match[1]!,match[2]!,JSON.parse(body)));}
       catch(error){send(res,400,{error:errorText(error)});}return;
     }
-    const browserSession = (req.headers.cookie ?? '').split(';').some(value => value.trim() === `helmdesk_${port}=${cookie}`);
+    const browserSession = browserSessions.get(req.headers['x-helmdesk-session']);
     const mcpSession = sameSecret(req.headers.authorization, `Bearer ${token}`);
+    if (url.pathname === '/api/browser-ticket') {
+      if (!mcpSession) { send(res, 401, {error:'网页入口需要本机私有身份授权'}); return; }
+      if (req.method !== 'POST' || !req.headers['content-type']?.startsWith('application/json')) { send(res, 415, {error:'需要 POST application/json'}); return; }
+      try {
+        let body=''; for await (const chunk of req) { body+=chunk; if(Buffer.byteLength(body)>1024)throw Error('请求过大'); }
+        z.object({}).strict().parse(JSON.parse(body));
+        send(res,200,{...browserTickets.issue(),instanceId:identity.instanceId});
+      } catch(error) { send(res,400,{error:errorText(error)}); } return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/session') {
+      if (req.headers.origin !== origin || !req.headers['content-type']?.startsWith('application/json')) { send(res,403,{error:'网页入口需要同源 JSON 请求'}); return; }
+      try {
+        let body=''; for await (const chunk of req) { body+=chunk; if(Buffer.byteLength(body)>1024)throw Error('请求过大'); }
+        const input=z.object({ticket:z.string().length(64).regex(/^[a-f0-9]{64}$/)}).strict().parse(JSON.parse(body));
+        if(!browserTickets.consume(input.ticket)){send(res,401,{error:'网页入口已使用或过期，请从应用重新打开'});return;}
+        send(res,200,browserSessions.issue());
+      }catch(error){send(res,400,{error:errorText(error)});}return;
+    }
     if (req.method === 'GET' && url.pathname === '/api/session') {
-      res.setHeader('Set-Cookie', `helmdesk_${port}=${cookie}; HttpOnly; SameSite=Strict; Path=/`); send(res, 200, { csrf }); return;
+      if(!browserSession&&!mcpSession){send(res,401,{error:'请从领航台应用的“浏览器”按钮或本机 CLI 网页入口打开'});return;}
+      send(res,200,mcpSession?browserSessions.issue():{csrf:browserSession!.csrf}); return;
     }
     if(req.method==='GET'&&url.pathname==='/favicon.ico'){res.writeHead(204);res.end();return;}
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname.startsWith('/assets/'))) {
@@ -134,6 +160,17 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       try { res.end(readFileSync(path)); } catch { send(res, 503, { error: '网页资源尚未构建' }); } return;
     }
     if (!browserSession && !mcpSession) { send(res, 401, { error: '需要领航台本机会话' }); return; }
+    if(url.pathname.startsWith('/api/desktop/')) {
+      if(!mcpSession){send(res,403,{error:'原生管理操作需要本机私有身份，网页会话无权调用'});return;}
+      if(req.method!=='POST'||!req.headers['content-type']?.startsWith('application/json')){send(res,415,{error:'需要 POST application/json'});return;}
+      try {
+        let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>32000)throw Error('管理请求过大');}
+        send(res,200,await desktop.execute(url.pathname.slice('/api/desktop/'.length),JSON.parse(body)));
+      }catch(error){send(res,400,{error:errorText(error)});}return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/runtime') {
+      send(res, 200, { ...identity, activeTasks: scheduler.queue().active }); return;
+    }
     if (req.method === 'GET' && url.pathname === '/api/state') { const tasks=store.list();send(res, 200, { tasks, projects:buildProjectSummaries(tasks), queue:scheduler.queue(), agent: store.snapshot('agent'),agents:store.snapshot('agents')??[],executionPolicy:policyView(store), quota: store.snapshot('quota'), capabilities: sharing.view(), modelPreference: modelPreference(store), models: store.snapshot('models'), cursor: store.latestSequence() }); return; }
     if (req.method === 'GET' && url.pathname === '/api/events') {
       const after = Number(req.headers['last-event-id'] ?? url.searchParams.get('after') ?? 0);
@@ -145,11 +182,12 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
         for (const event of store.events(cursor, undefined, 1000)) { if (!res.write(`id: ${event.seq}\ndata: ${safeJson(event)}\n\n`)) { res.end(); break; } cursor = event.seq; }
       };
       const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
+      const expiry=browserSession&&!mcpSession?setTimeout(()=>res.end(),Math.max(0,browserSession.expiresAt-Date.now())):undefined;
       store.on('change', flush); flush();
-      req.on('close', () => { clearInterval(heartbeat); store.off('change', flush); }); return;
+      req.on('close', () => { clearInterval(heartbeat);if(expiry)clearTimeout(expiry);store.off('change', flush); }); return;
     }
     if (req.method !== 'POST' || !url.pathname.startsWith('/api/tool/')) { send(res, 404, { error: '地址不存在' }); return; }
-    if (!mcpSession && (!browserSession || req.headers.origin !== origin || !sameSecret(req.headers['x-helmdesk-csrf'] as string, csrf))) { send(res, 403, { error: '写操作需要同源会话和 CSRF 校验' }); return; }
+    if (!mcpSession && (!browserSession || req.headers.origin !== origin || !sameSecret(req.headers['x-helmdesk-csrf'] as string, browserSession.csrf))) { send(res, 403, { error: '写操作需要同源会话和 CSRF 校验' }); return; }
     if (!req.headers['content-type']?.startsWith('application/json')) { send(res, 415, { error: '需要 application/json' }); return; }
     try {
       let body = ''; for await (const chunk of req) { body += chunk; if (Buffer.byteLength(body) > 100_000) { send(res, 413, { error: '请求过大' }); return; } }
@@ -178,14 +216,17 @@ export async function serve(directory: string, port: number, concurrency=1) {
   }
   writeFileSync(lockPath, String(process.pid), { flag: 'wx', mode: 0o600 });
   const store = new Store(directory); store.recover();
+  const desktopConfig=desktopConfiguration(directory).configuration;
+  if(desktopConfig.qoderCLI)process.env.HELMDESK_QODER_CLI=desktopConfig.qoderCLI;
   const sharing=new Sharing(store,`http://127.0.0.1:${port}`);
-  const scheduler = new Scheduler(store, new AgentExecutor(directory,sharing),undefined,concurrency);
+  const scheduler = new Scheduler(store, new AgentExecutor(directory,sharing),[...desktopConfig.projectRoots,join(directory,'probe-project')],concurrency);
   const token = randomBytes(32).toString('hex');
-  const server = createServer(createApp(store, scheduler, port, token,undefined,sharing));
+  const identity = appIdentity(directory, port);
+  const server = createServer(createApp(store, scheduler, port, token,undefined,sharing,identity,()=>shutdown()));
   server.requestTimeout = 65000;
   try { await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); }); }
   catch (error) { unlinkSync(lockPath); store.close(); throw error; }
-  writeFileSync(join(directory, 'connection.json'), JSON.stringify({ port, token }), { mode: 0o600 });
+  writeFileSync(join(directory, 'connection.json'), JSON.stringify({ ...identity, pid: process.pid, token }), { mode: 0o600 });
   const shutdown = () => { scheduler.stop(); server.close(); server.closeAllConnections(); void sharing.shutdown().finally(()=>{unlinkSync(lockPath); unlinkSync(join(directory, 'connection.json')); setTimeout(() => process.exit(), 250).unref();}); };
   process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
   console.log(`领航台已启动： http://127.0.0.1:${port}\n数据目录：${directory}\n隔离执行槽位：${concurrency}`);

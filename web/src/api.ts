@@ -1,5 +1,6 @@
+import {sessionHeaders} from './session.js';
 export async function tool<T = any>(name: string, args: object = {}, csrf: string): Promise<T> {
-  const response = await fetch(`/api/tool/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-HelmDesk-CSRF': csrf }, body: JSON.stringify(args) });
+  const response = await fetch(`/api/tool/${name}`, { method: 'POST', credentials:'omit',redirect:'error', headers: { ...sessionHeaders(), 'Content-Type': 'application/json', 'X-HelmDesk-CSRF': csrf }, body: JSON.stringify(args) });
   const data = await response.json(); if (!response.ok) throw new Error(data.error ?? '请求失败'); return data;
 }
 export const states: Record<string, string> = { queued: '排队中', preparing: '准备中', running: '执行中', waiting_user: '等待处理', completed: '已完成', failed: '失败', cancelled: '已取消' };

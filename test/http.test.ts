@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { Store } from '../src/store.js';
 import { Scheduler } from '../src/scheduler.js';
 import { createApp } from '../src/server.js';
+import {deliveryVersion} from '../src/verified-delivery.js';
 
 test('loopback API rejects foreign origins, host rebinding, missing sessions, and invalid CSRF; SSE resumes after cursor', async () => {
   const root = mkdtempSync(join(tmpdir(), 'helmdesk-http-')); const data = join(root, 'data'); mkdirSync(data);
@@ -20,21 +21,32 @@ test('loopback API rejects foreign origins, host rebinding, missing sessions, an
   app = createApp(store, scheduler, address.port, 'test-service-token', async () => ({ source: 'fixture', sampledAt: new Date().toISOString(), models: ['Auto', 'Fixture-Max','Qwen3.8-Flash'], options: [{id:'Auto',label:'Auto',kind:'platform' as const},{id:'Fixture-Max',label:'Fixture-Max',kind:'platform' as const},{id:'Qwen3.8-Flash',label:'Qwen3.8-Flash',kind:'platform' as const}], availability: 'test fixture' }));
   try {
     assert.equal((await fetch(base + '/api/state')).status, 401);
+    assert.equal((await fetch(base + '/api/runtime')).status, 401);
+    assert.equal((await fetch(base + '/api/runtime', { headers: { Authorization: 'Bearer wrong' } })).status, 401);
+    const runtime = await (await fetch(base + '/api/runtime', { headers: { Authorization: 'Bearer test-service-token' } })).json();
+    assert.equal(runtime.service, 'helmdesk'); assert.equal(runtime.protocolVersion, 1);
+    assert.equal(runtime.port, address.port); assert.equal(runtime.activeTasks, 0);
+    assert.equal(runtime.dataDirectory, await import('node:fs').then(fs => fs.realpathSync(data)));
+    assert.match(runtime.instanceId, /^[0-9a-f-]{36}$/);
+    assert.ok(!JSON.stringify(runtime).includes('test-service-token'));
+    const runtimeAgain = await (await fetch(base + '/api/runtime', { headers: { Authorization: 'Bearer test-service-token' } })).json();
+    assert.equal(runtimeAgain.instanceId, runtime.instanceId);
+    assert.equal((await fetch(base + '/api/runtime', { headers: { Authorization: 'Bearer test-service-token', Origin: 'https://foreign.test' } })).status, 403);
     assert.equal((await fetch(base + '/api/session', { headers: { Origin: 'https://foreign.test' } })).status, 403);
     const rebind = await new Promise<number>(resolve => { const req = request(base + '/api/session', { headers: { Host: 'rebind.test' } }, response => { response.resume(); resolve(response.statusCode!); }); req.end(); });
     assert.equal(rebind, 403);
-    const session = await fetch(base + '/api/session'); const cookie = session.headers.get('set-cookie')!.split(';')[0]!, csrf = (await session.json()).csrf;
+    const session = await fetch(base + '/api/session', {headers:{Authorization:'Bearer test-service-token'}}); const {browserToken,csrf}=await session.json();
     const post = (headers: Record<string,string>, body = '{}') => fetch(base + '/api/tool/task_list', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body });
-    assert.equal((await post({ Cookie: cookie, Origin: base })).status, 403);
-    assert.equal((await post({ Cookie: cookie, Origin: 'https://foreign.test', 'X-HelmDesk-CSRF': csrf })).status, 403);
-    assert.equal((await post({ Cookie: cookie, Origin: base, 'X-HelmDesk-CSRF': csrf })).status, 200);
+    assert.equal((await post({ 'X-HelmDesk-Session':browserToken, Origin: base })).status, 403);
+    assert.equal((await post({ 'X-HelmDesk-Session':browserToken, Origin: 'https://foreign.test', 'X-HelmDesk-CSRF': csrf })).status, 403);
+    assert.equal((await post({ 'X-HelmDesk-Session':browserToken, Origin: base, 'X-HelmDesk-CSRF': csrf })).status, 200);
     assert.equal((await post({ Authorization: 'Bearer test-service-token' })).status, 200);
     assert.equal((await post({ Authorization: 'Bearer wrong' })).status, 401);
     for(const credential of ['test-service-token','x'.repeat(64)]) assert.equal((await fetch(base+'/gateway/00000000-0000-0000-0000-000000000000/call',{method:'POST',headers:{Authorization:'Bearer '+credential,'Content-Type':'application/json'},body:'{}'})).status,401);
     assert.equal((await post({ Authorization: 'Bearer test-service-token' }, '[]')).status, 400);
     const pref = await fetch(base + '/api/tool/model_preference_set', { method: 'POST', headers: { Authorization: 'Bearer test-service-token', 'Content-Type': 'application/json' }, body: JSON.stringify({model:'Fixture-Max'}) });
     assert.equal(pref.status, 200); assert.equal((await pref.json()).model, 'Fixture-Max');
-    const state = await fetch(base + '/api/state', { headers: { Cookie: cookie } }); const loaded=await state.json();assert.equal(loaded.modelPreference.model, 'Fixture-Max');assert.equal(loaded.queue.concurrency,1);
+    const state = await fetch(base + '/api/state', { headers: { 'X-HelmDesk-Session':browserToken } }); const loaded=await state.json();assert.equal(loaded.modelPreference.model, 'Fixture-Max');assert.equal(loaded.queue.concurrency,1);
     const queue=await fetch(base+'/api/tool/queue_get',{method:'POST',headers:{Authorization:'Bearer test-service-token','Content-Type':'application/json'},body:'{}'});assert.equal(queue.status,200);assert.equal((await queue.json()).active,0);
     scheduler.stop(); // Keep submissions queued; this test never invokes an agent.
     const projectPath = join(data, 'probe-project'); mkdirSync(projectPath);
@@ -80,6 +92,7 @@ test('loopback API rejects foreign origins, host rebinding, missing sessions, an
     assert.equal((await invoke('task_submit',handoff)).status,400); // Completed is not accepted.
     const sourceWorkspace=join(data,'tasks',inherited.id,'workspace');mkdirSync(sourceWorkspace,{recursive:true});writeFileSync(join(sourceWorkspace,'result.txt'),'ok\n');
     store.patch(inherited.id,{mode:'files',allowedFiles:['result.txt'],workspace:sourceWorkspace,acceptance:'accepted',verification:{status:'passed',command:'fixture',evidence:'ok',recordedAt:new Date().toISOString()},changes:[{path:'result.txt',kind:'added',diff:'+ok',sha256:createHash('sha256').update('ok\n').digest('hex'),bytes:3}]});
+    store.patch(inherited.id,{verification:{...store.get(inherited.id).verification!,deliveryVersion:deliveryVersion(store.get(inherited.id))}});
     const handed=await invoke('task_submit',handoff);assert.equal(handed.status,200);const child=await handed.json();assert.deepEqual(child.dependencies,[inherited.id]);assert.equal(child.inputRun.files[0].mountedPath,`.helmdesk-inputs/${inherited.id}/result.txt`);assert.equal(child.inputRun.isolationVerified,false);
     assert.equal((await invoke('task_submit',{...handoff,mode:'probe'})).status,400);
     assert.equal((await fetch(base+'/api/tool/task_export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({taskId:inherited.id})})).status,401);
@@ -104,7 +117,7 @@ test('loopback API rejects foreign origins, host rebinding, missing sessions, an
     assert.equal(store.get(inherited.id).acceptance,'accepted');assert.equal((await invoke('task_revision_prepare',{...revisionRequest,allowedFiles:['escape']})).status,400);
     store.event('fixture', 'first', {}); const cursor = store.latestSequence(); store.event('fixture', 'second', {});
     const controller = new AbortController();
-    const response = await fetch(base + `/api/events?after=${cursor}`, { headers: { Cookie: cookie }, signal: controller.signal });
+    const response = await fetch(base + `/api/events?after=${cursor}`, { headers: { 'X-HelmDesk-Session':browserToken }, signal: controller.signal });
     assert.equal(response.headers.get('content-type'), 'text/event-stream');
     const first = await response.body!.getReader().read(); const text = new TextDecoder().decode(first.value); assert.ok(text.includes('second')); assert.ok(!text.includes('first')); controller.abort();
   } finally { scheduler.stop(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); store.close(); rmSync(root, { recursive: true, force: true }); }

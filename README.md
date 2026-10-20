@@ -4,9 +4,26 @@
 
 HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex 里描述目标，由它拆解任务、审查结果；Qoder 在独立工作区完成明确范围内的改动；领航台把队列、差异、验证和用量放进同一个中文看板。
 
-**macOS · Node.js 24+ · TypeScript / React · SQLite · 28 项 MCP 工具**
+**macOS 原生应用 · 本地执行与数据 · TypeScript / React / SwiftUI · 28 项 MCP 工具**
 
 [快速上手](docs/quickstart.md) · [博客教程](https://blog.mashutaba.best/post/helmdesk-quickstart) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
+
+## 下载 Mac 应用
+
+**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.1/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.1)
+
+> **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
+
+1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
+2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。
+3. 安装并登录 **Qoder CN 官方 App 或兼容 CLI**，在领航台设置中授权项目目录、选择账号实际可用的模型。
+4. 从设置导出 MCP 配置，检查路径后加入 Codex；先调用 `queue_get` 确认接入，再派发任务。
+
+当前提供 **Apple Silicon（arm64）** 产物。部署目标 macOS 14+，本机验收环境为 macOS 27；macOS 14、Intel、其他 Mac 与整机休眠唤醒尚未实测。首次启动默认把数据保存在 `~/Library/Application Support/HelmDesk/`，也可选择旧数据目录；关窗或退出界面保留独立后台任务。
+
+SwiftUI / WKWebView 容器提供执行器与项目目录设置、换端口与空闲重启、诊断、一致性数据库备份、原生报告/补丁保存和 MCP 配置导出。执行验证绑定交付版本，旧证据不能放行变化后的交付。iOS 和手机连接暂缓，后续手机定位为 Mac 的镜像控制端。
+
+详见 [安装与故障处理](docs/macos-install.md)、[Mac 功能范围](docs/macos-roadmap.md)和[发布检查表](docs/release-checklist.md)。第三方许可与组件清单随包提供；GitHub 源码不包含个人配置、模型凭据、真实数据库或任务记录。
 
 ## 它解决什么问题
 
@@ -38,7 +55,7 @@ Qoder 执行 → Codex 验证与审核 → 明确整合
 | 历史处理 | 分开标记已解决、预期失败、暂缓处理，保留原始失败和处理原因 |
 | 运行控制 | 时限、可选轮数上限、按执行器和模型区分的累计 Credits 阈值 |
 
-## 先把看板跑起来
+## 从源码运行（开发者）
 
 需要 **macOS、Git、Node.js 24+**，以及已登录的 **Qoder CN 官方 CLI 或 Qoder CN App**。HelmDesk 复用已有 CLI 登录，不要求额外填写模型 API Key。
 
@@ -56,13 +73,23 @@ node dist/cli.js doctor --data-dir .helmdesk
 node dist/cli.js serve --data-dir .helmdesk --concurrency 2
 ```
 
-保留终端，打开 **<http://127.0.0.1:4317/>**。默认并发为 1，示例明确开启 2；只支持 1 或 2。看板用于查看和审核过程，派发入口在 MCP 宿主中。
+保留服务终端，另开交互终端运行 `node dist/cli.js browser --data-dir .helmdesk`，在 60 秒内打开生成的一次性网页入口。Mac 应用可直接点击“浏览器”。默认并发为 1，示例明确开启 2；只支持 1 或 2。看板用于查看和审核过程，派发入口在 MCP 宿主中。
 
 后续可用 `npm run dev` 构建并启动单槽位服务；源码修改后需重新构建并重启。不要在同一数据目录重复启动服务。
 
+构建原生应用还需要 Swift 6 工具链与 macOS SDK，并使用锁定的 Node.js **24.15.0**：
+
+```sh
+./script/package_macos.sh
+./script/install_macos.sh
+./script/distribute_macos.sh --skip-build
+```
+
+应用生成于 `dist/HelmDesk.app`，安装脚本写入 `~/Applications/HelmDesk.app` 并保留旧包；分发脚本生成 DMG、ZIP、校验值和安装说明。开发启动、数据目录及测试方式见 [Mac 使用说明](docs/macos-install.md)。
+
 ## 再把 Codex 接进来
 
-在 HelmDesk 根目录执行 `command -v node` 和 `pwd`，取得 Node 与项目的实际路径，再按 [完整配置示例](docs/codex-mcp.toml.example) 设置 stdio MCP：
+已安装 Mac 应用的用户可在设置中导出 MCP 配置，使用应用内 Node/CLI 路径，无需源码目录。源码用户在 HelmDesk 根目录执行 `command -v node` 和 `pwd`，取得实际路径，再按 [完整配置示例](docs/codex-mcp.toml.example) 设置 stdio MCP：
 
 ```toml
 [mcp_servers.helmdesk]
@@ -109,10 +136,10 @@ node scripts/register-codex-mcp.mjs --apply
 
 ## 数据和权限
 
-- **本机访问**：服务仅监听 `127.0.0.1`，检查 Host / Origin，网页写操作使用会话与 CSRF，MCP 使用私有连接令牌。
-- **明确项目范围**：默认只接受服务启动目录及子目录；其他位置须启动前通过 `HELMDESK_PROJECT_ROOTS` 明确配置，macOS 用 `:` 分隔。Git 项目必须是干净且已有提交的仓库根目录。
+- **本机访问**：服务仅监听 `127.0.0.1`，检查 Host / Origin，网页入口须由本机私有身份签发的一次性票据授权；网页凭据保存在按来源隔离的会话存储，通过显式请求头认证 API 与实时事件，不使用 Cookie，写操作另校验 CSRF。MCP 使用私有连接令牌。
+- **明确项目范围**：Mac 应用在设置中保存项目根目录；源码服务优先使用已保存配置，无保存配置时才采用 `HELMDESK_PROJECT_ROOTS` 或启动目录，macOS 多根目录用 `:` 分隔。Git 项目必须是干净且已有提交的仓库根目录。
 - **受限文件工具**：执行者只开放 `Read / Write / Edit / Glob / Grep`，写入受白名单限制，不开放 Shell、子代理或递归派活。宿主负责终端验证和整合。
-- **隔离与过滤**：任务副本排除 `.env*`、凭据和宿主配置目录、依赖及构建产物；拒绝符号链接。当前限制 2000 个文件、单文件 2MB、合计 20MB。Git checkout 后也清除排除项。
+- **隔离与过滤**：任务副本排除 `.env*`、已知凭据与宿主目录（包括嵌套 `.ssh`、`.agents`、`.qoder-cn` 等）、可识别的私钥/凭据文件、依赖及构建产物；拒绝符号链接。当前限制 2000 个文件、单文件 2MB、合计 20MB。Git checkout 后也清除排除项。文件名过滤不能识别所有秘密；派发前仍须确认项目不含其他敏感内容。
 - **显式共享**：Skills 和本地只读 MCP 须按 [示例](docs/sharing.example.json) 选择、批准，再逐任务授权；不自动导出宿主配置、OAuth 或登录令牌。
 - **保留现场**：取消与失败保留工作副本及历史；异常重启不自动重试，也不凭历史 PID 误杀新进程。
 
@@ -140,11 +167,14 @@ npm test
 npm run build
 ```
 
-当前 233 项自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
+自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
+
+本次发布前本地验证：Node **279 项**、Swift **28 项**通过，已安装窗口、原生保存、28 项 MCP 工具握手、旧数据升级保留及归档验包通过；最终离线源码安全复扫未发现遗留可报告问题。这不等于第三方依赖实现审计或异机兼容验证；远端 CI 状态以 GitHub Actions 为准。
 
 | 文档 | 内容 |
 | --- | --- |
 | [快速上手](docs/quickstart.md) | 安装、MCP 接入、演示项目和第一次完整交付，也提供博客版 |
+| [Mac 安装与使用](docs/macos-install.md) | DMG、签名限制、设置、数据、备份、导出与卸载 |
 | [日常使用与验收](docs/v0.1日常使用与验收.md) | 操作步骤、恢复处理和验收清单 |
 | [MCP 配置](docs/codex-mcp.toml.example) | 本地 stdio 配置模板 |
 | [能力共享配置](docs/sharing.example.json) | 显式批准 Skills 与只读 MCP |

@@ -54,6 +54,8 @@ test('queue completes in an independent copy and records usage exactly once', as
     assert.equal(readFileSync(join(f.project, 'input.txt'), 'utf8'), 'original'); assert.equal(existsSync(join(f.project, 'result.txt')), false);
     assert.equal(result.task.changes?.[0]?.path, 'result.txt');
     const first = f.store.events(0, task.id); const cursor = first.at(-1)!.seq; assert.equal(f.store.events(cursor, task.id).length, 0);
+    assert.throws(()=>s.review(task.id,'accepted','missing evidence'),/宿主验证/);
+    s.verifyTask(task.id,{status:'passed',command:'host fixture assertions',evidence:'output bytes and original project checked'});
     s.review(task.id, 'accepted', 'Content verified'); assert.equal(f.store.get(task.id).acceptance, 'accepted');
   } finally { s.stop(); f.close(); }
 });
@@ -62,6 +64,7 @@ test('dependent task waits for acceptance, and concurrency is one', async () => 
   try {
     const first = s.submit(f.submission), second = s.submit({ ...f.submission, dependencies: [first.id] });
     await s.wait(first.id, 0, 3000); assert.equal(fake.starts, 1); assert.equal(f.store.get(second.id).state, 'queued');
+    s.verifyTask(first.id,{status:'passed',command:'fixture assertions',evidence:'checked'});
     s.review(first.id, 'accepted', 'verified'); const result = await s.wait(second.id, 0, 3000); assert.equal(result.task.state, 'completed'); assert.equal(fake.starts, 2);
   } finally { s.stop(); f.close(); }
 });

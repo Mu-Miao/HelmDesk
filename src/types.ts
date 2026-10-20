@@ -33,6 +33,6 @@ export interface Task extends Submission {
   usage?: { taskCredits: number | null; sessionCredits: number | null; inputTokens: number | null; outputTokens: number | null; usd: number | null; tokenNote: string; source: string };
   changes?: { path: string; kind: string; diff: string; sha256?:string; bytes?:number; beforeSha256?:string; beforeBytes?:number }[];
   reviewNote?: string;
-  verification?: { status: 'passed' | 'failed' | 'not_run'; command: string; evidence: string; recordedAt: string };
+  verification?: { status: 'passed' | 'failed' | 'not_run'; command: string; evidence: string; recordedAt: string; deliveryVersion?: string };
 }
 export interface TaskEvent { seq: number; taskId: string; type: string; at: string; data: unknown }

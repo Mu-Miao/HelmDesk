@@ -9,6 +9,7 @@ export interface CapabilityRun {
   isolation?: { verified: boolean; checks: string[]; protectedRoots: string[] };
   configDirectory?: string;
   authentication?: {mode:'read-only-existing-login';verified:boolean};
+  modelConfiguration?: {mode:'read-only-existing-models';verified:boolean};
 }
 export interface CapabilityCatalog {
   enabled: boolean; direction: string; reason: string; sampledAt: string;

@@ -4,9 +4,10 @@ import { createHash } from 'node:crypto';
 import { runCommand } from './qoder.js';
 import type { Task } from './types.js';
 import { INPUT_DIRECTORY } from './input-types.js';
+import { protectedProjectEntry } from './protected-paths.js';
 
-const excluded = new Set(['.git', 'node_modules', '.helmdesk', '.env', '.aws', '.codex', '.qoder', 'dist', '.DS_Store', INPUT_DIRECTORY]);
-export const excludedProjectEntry=(name:string)=>excluded.has(name)||name.startsWith('.env');
+const excluded = new Set(['.git', 'node_modules', '.helmdesk', '.env', '.aws', '.codex', '.qoder', 'dist', '.ds_store', INPUT_DIRECTORY]);
+export const excludedProjectEntry=(name:string)=>excluded.has(name.toLowerCase())||name.toLowerCase().startsWith('.env')||protectedProjectEntry(name);
 // Checkout may materialize tracked secrets. Remove excluded entries only inside our new task worktree.
 function stripExcludedWorktreeEntries(root:string) {
   function walk(dir:string) {
@@ -39,7 +40,7 @@ export function inventory(root: string): Map<string, Buffer> {
 export function pathAllowed(path: string, files: string[]) { return files.some(p => p.endsWith('/') ? path.startsWith(p) : path === p); }
 export function validateScope(files: string[]) {
   for (const file of files) {
-    if (!file || file.startsWith('/') || file.includes('\\') || file.split('/').some(p => p === '..' || p === '.' || excluded.has(p) || p.startsWith('.env'))) throw new Error('文件范围必须为明确的项目相对路径；目录以 / 结尾，禁止 ..、配置或凭据目录');
+    if (!file || file.startsWith('/') || file.includes('\\') || file.split('/').some(p => p === '..' || p === '.' || excludedProjectEntry(p))) throw new Error('文件范围必须为明确的项目相对路径；目录以 / 结尾，禁止 ..、配置或凭据目录');
   }
 }
 const projectPreparations=new Map<string,Promise<void>>();

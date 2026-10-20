@@ -1,5 +1,6 @@
 import { INPUT_DIRECTORY } from './input-types.js';
 import type { InputFile, InputSelection, InputSource } from './input-types.js';
+import {protectedProjectEntry} from './protected-paths.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHA_RE = /^[0-9a-f]{64}$/;
@@ -47,7 +48,7 @@ function validatePath(path: string, taskId: string): void {
     if (segment === '' || segment === '.' || segment === '..') {
       throw new Error(`路径段非法: ${path}`);
     }
-    if (RESERVED_SEGMENTS.has(segment) || segment.startsWith('.env')) {
+    if (RESERVED_SEGMENTS.has(segment) || segment.startsWith('.env') || protectedProjectEntry(segment)) {
       throw new Error(`路径保留段禁止: ${path}`);
     }
   }

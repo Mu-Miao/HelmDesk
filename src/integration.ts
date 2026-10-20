@@ -6,10 +6,12 @@ import type {FileStamp,IntegrationObservation,IntegrationPreview,IntegrationPatc
 import {planIntegration} from './integration-policy.js';
 import {pathAllowed,validateScope} from './workspace.js';
 import {safeJson} from './redact.js';
+import {assertDeliveryVersion} from './verified-delivery.js';
+import {protectedDirectoryNames,protectedProjectEntry} from './protected-paths.js';
 
 const MAX_FILES=20, MAX_FILE_BYTES=1_000_000, MAX_TOTAL_BYTES=4_000_000;
 const reserved=new Set(['.git','.helmdesk','.helmdesk-inputs','.codex','.agents','.aws','.ssh','.qoder','.qoder-cn','.qoderworkcn','node_modules','dist','.DS_Store']);
-const protectedRoots=new Set(['.codex','.agents','.aws','.ssh','.qoder','.qoder-cn','.qoderworkcn']);
+const protectedRoots=protectedDirectoryNames;
 const hash=(bytes:Buffer|string)=>createHash('sha256').update(bytes).digest('hex');
 const stamp=(bytes:Buffer):FileStamp=>({sha256:hash(bytes),bytes:bytes.length});
 function matches(bytes:Buffer|null,expected:FileStamp|null){return bytes===null?expected===null:expected!==null&&bytes.length===expected.bytes&&hash(bytes)===expected.sha256;}
@@ -17,11 +19,11 @@ function validStamp(sha256:unknown,bytes:unknown):FileStamp|null{
   return typeof sha256==='string'&&/^[a-f0-9]{64}$/.test(sha256)&&typeof bytes==='number'&&Number.isSafeInteger(bytes)&&bytes>=0&&bytes<=MAX_FILE_BYTES?{sha256,bytes}:null;
 }
 function validatePath(path:string){
-  if(typeof path!=='string'||!path||path.length>500||/[\x00-\x1f\x7f\\]/.test(path)||path.startsWith('/')||path.split('/').some(p=>!p||p==='.'||p==='..'||reserved.has(p)||p.startsWith('.env')))throw Error('整合路径必须为安全的项目内文件路径');
+  if(typeof path!=='string'||!path||path.length>500||/[\x00-\x1f\x7f\\]/.test(path)||path.startsWith('/')||path.split('/').some(p=>!p||p==='.'||p==='..'||reserved.has(p)||p.startsWith('.env')||protectedProjectEntry(p)))throw Error('整合路径必须为安全的项目内文件路径');
 }
 function checkedRoot(path:string){
   const root=resolve(path),stat=lstatSync(root),canonical=realpathSync(root);
-  if(stat.isSymbolicLink()||!stat.isDirectory()||canonical.split(sep).some(p=>protectedRoots.has(p)))throw Error('整合目录包含符号链接、配置来源或不是实际目录');
+  if(stat.isSymbolicLink()||!stat.isDirectory()||canonical.split(sep).some(p=>protectedRoots.has(p.toLowerCase())))throw Error('整合目录包含符号链接、配置来源或不是实际目录');
   return canonical;
 }
 function readOptional(root:string,path:string,budget:{bytes:number}):Buffer|null{
@@ -62,6 +64,7 @@ function filePatch(path:string,before:Buffer|null,after:Buffer|null){
 }
 function inspect(task:Task,dataDir:string,paths?:string[]){
   if(task.state!=='completed'||task.acceptance!=='accepted'||task.verification?.status!=='passed')throw Error('仅已完成、验证通过且验收通过的交付可以整合预检');
+  assertDeliveryVersion(task);
   if(!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(task.id)||task.mode!=='files')throw Error('整合预检需要有效文件任务');
   const changes=task.changes??[],selected=paths??changes.map(c=>c.path);
   if(selected.length>MAX_FILES||new Set(selected).size!==selected.length)throw Error('选择 0–20 个不同的交付文件');
