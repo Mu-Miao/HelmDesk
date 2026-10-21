@@ -10,9 +10,11 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 ## 下载 Mac 应用
 
-**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.1/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.1)
+**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.2/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.2)
 
 > **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
+
+本次 **preview.2（应用构建号 2）** 修复 Qoder CN 新版自定义供应商模型接入：完整识别模型 ID，支持已有 `providers` 配置。已通过 `deepseek-v4.1-flash-1017` 的真实对话、隔离文件写入和安装版调用验收。
 
 1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
 2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。
@@ -47,7 +49,7 @@ Qoder 执行 → Codex 验证与审核 → 明确整合
 | --- | --- |
 | 派发与协作 | 单槽位或显式双槽位运行，展示排队及依赖阻塞原因 |
 | 独立工作区 | 干净 Git 仓库建立 detached worktree，非 Git 项目建立副本 |
-| 模型与思考深度 | 从 CLI 目录选模型；Flash 支持低、中、极高，任务创建后固定选择 |
+| 模型与思考深度 | 从 CLI 目录选平台或已有自定义模型；兼容完整供应商模型 ID；已适配的 Flash 支持低、中、极高，任务创建后固定选择 |
 | 可读的交付 | Markdown 摘要、按文件折叠的差异、事件时间线、审核报告 |
 | 验证与整合 | 执行、验证、验收分别记录；预检冲突，导出并校验补丁 |
 | 项目与修订 | 按项目查看任务和已记录用量，显式修订保留新旧历史 |
@@ -124,6 +126,8 @@ node scripts/register-codex-mcp.mjs --apply
 
 模型须出现在当前 CLI 目录。任务中的 `projectPath` 使用真实绝对路径，`allowedFiles` 明确到文件。省略模型时继承已保存的默认值；模型和深度创建后固定，不支持的选择会报错，不静默降档或换模型。
 
+已有自定义供应商模型在菜单中标为“自定义”。新版 Qoder 的命令行表格会截短模型 ID，HelmDesk 用已有供应商配置中的模型名称和 ID 前缀作唯一匹配，执行时传入完整的 `qoder-custom-…/模型名`；无法唯一匹配时不把截短文本作为可执行模型。旧版 UUID 自定义模型继续使用原有只读模型目录。新版配置只读引用，仅所选供应商和模型进入 SDK；密钥通过子进程环境传递，生成的 SDK 设置使用环境变量占位，不复制密钥到任务文件，也不继承用户的插件、Hooks 或 MCP 设置。当前不继承供应商密钥中的父进程环境变量引用，遇到此类配置会明确拒绝。
+
 日常流程是：
 
 1. **派发**：用 `task_submit` 写清范围、验收条件和时限。
@@ -169,7 +173,7 @@ npm run build
 
 自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
 
-本次发布前本地验证：Node **279 项**、Swift **29 项**通过，已安装窗口、原生保存、28 项 MCP 工具握手、旧数据升级保留及归档验包通过；最终离线源码安全复扫未发现遗留可报告问题。这不等于第三方依赖实现审计或异机兼容验证；远端 CI 状态以 GitHub Actions 为准。
+本次发布前本地验证：Node **282 项**、Swift **29 项**通过；类型检查、生产构建、分发包审计通过。自定义 DeepSeek 的精确文本响应、隔离文件写入及安装版 MCP 调用已实测，原任务历史保留，任务文件未发现供应商密钥。包签名完整性、DMG 只读挂载和 ZIP 解压验包另行检查；这些检查不代表 Developer ID 签名、公证、异机兼容或第三方依赖实现审计。远端 CI 状态以 [GitHub Actions](https://github.com/Mu-Miao/HelmDesk/actions) 为准。
 
 | 文档 | 内容 |
 | --- | --- |

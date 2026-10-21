@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { errorText } from './redact.js';
 import { killOwnedGroup } from './process.js';
 import type { ModelOption } from './model-types.js';
+import { providerModelOptions } from './provider-models.js';
 
 export const appRuntime = '/Applications/Qoder CN.app/Contents/Resources/app.asar.unpacked/node_modules/@qoder-ai/qoder-cn-agent-sdk/dist/_worker/qoder-worker-runtime.obf.mjs';
 export interface Runtime { command: string; args: string[]; path: string; source: 'official-cli' | 'app-runtime' | 'explicit'; }
@@ -57,12 +58,22 @@ export async function listModels() {
   if (result.code !== 0) throw new Error(errorText(result.stderr || '模型发现超时或失败'));
   const lines = result.stdout.replace(/\x1b\[[0-9;]*m/g, '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   if (lines[0] !== 'MODEL') throw new Error('模型输出格式变化；未猜测模型目录');
-  return { source: 'qoderclicn --list-models', sampledAt: new Date().toISOString(), models: lines.slice(1), options: parseModelOptions(lines.slice(1)), availability: '可列出不表示调用成功或额度充足；自定义模型可能使用独立供应商额度' };
+  return { source: 'qoderclicn --list-models', sampledAt: new Date().toISOString(), models: lines.slice(1), options: parseModelOptions(lines.slice(1), providerModelOptions()), availability: '可列出不表示调用成功或额度充足；自定义模型可能使用独立供应商额度' };
 }
 
-export function parseModelOptions(models: string[]): ModelOption[] {
-  return models.map(label => {
-    const match = /^(.*?)\s+\(([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\)$/i.exec(label);
-    return match ? { id: match[2]!, label: match[1]!, kind: 'custom' } : { id: label, label, kind: 'platform' };
+export function parseModelOptions(models: string[], providers: ModelOption[] = []): ModelOption[] {
+  return models.flatMap(label => {
+    const row = /^(.*?)\s+\((.*?)\)$/.exec(label);
+    if (row) {
+      const id = row[2]!, name = row[1]!;
+      if (id.endsWith('…') || id.endsWith('...')) {
+        const prefix = id.replace(/(?:…|\.\.\.)$/, '');
+        const matches = providers.filter(option => option.label === name && option.id.startsWith(prefix));
+        // Human CLI tables truncate IDs to 40 characters. Never execute an ambiguous or truncated identifier.
+        return matches.length === 1 ? matches : [];
+      }
+      if (/^(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}|qoder-custom-[0-9a-f-]{36}\/\S+)$/i.test(id)) return [{ id, label: name, kind: 'custom' as const }];
+    }
+    return [{ id: label, label, kind: 'platform' as const }];
   });
 }

@@ -6,9 +6,16 @@ import { readFileSync } from 'node:fs';
 import { safeJson, errorText } from './redact.js';
 import { toolDecision, fileTools } from './tool-policy.js';
 import {flashReasoningPolicy} from './reasoning.js';
+import { selectedProviderSettings } from './provider-models.js';
+import { join } from 'node:path';
 
 const spec = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as { prompt: string; cwd: string; runtime: string; model: string;maxTurns?:number; reasoningEffort?:import('./reasoning.js').ReasoningEffort; mode: 'probe' | 'files'; allowedFiles: string[]; quotaOnly?: boolean; gateway?:WorkerGateway; configDirectory?:string; inputs?:import('./input-types.js').InputFile[] };
-function emit(type: string, data: unknown) { process.stdout.write(safeJson({ type, data }) + '\n'); }
+const provider = spec.model.startsWith('qoder-custom-') && spec.configDirectory ? selectedProviderSettings(join(spec.configDirectory,'provider-settings.json'),spec.model) : undefined;
+function emit(type: string, data: unknown) {
+  let text = safeJson({ type, data });
+  if (provider) text = text.split(JSON.stringify(provider.env.HELMDESK_PROVIDER_KEY).slice(1,-1)).join('[REDACTED]');
+  process.stdout.write(text + '\n');
+}
 let releaseInput: (() => void) | undefined;
 async function* noPrompt(): AsyncGenerator<never> { await new Promise<void>(resolve => { releaseInput = resolve; }); }
 const tools = spec.mode === 'probe' ? [] : fileTools;
@@ -43,7 +50,8 @@ const q = query({ prompt: spec.quotaOnly ? noPrompt() : sharingPrompt+inputPromp
     return { behavior: 'allow', updatedInput: input };
   },
   settingSources: [], strictMcpConfig: true, mcpServers: sharedTools.length?{helm:createSdkMcpServer({name:'helm',tools:sharedTools})}:{}, plugins: [], skills: [],
-  env:spec.configDirectory?{...process.env,QODERCN_CONFIG_DIR:spec.configDirectory,QODERCN_MEMORY:'0',QODERCN_MEMORY_USER:'0'}:undefined,
+  settings: provider?.settings,
+  env:spec.configDirectory?{...process.env,...provider?.env,QODERCN_CONFIG_DIR:spec.configDirectory,QODERCN_MEMORY:'0',QODERCN_MEMORY_USER:'0'}:undefined,
   persistSession: false,
   extraArgs: { 'max-model-request-retries': '0', 'max-output-tokens': spec.mode === 'probe' ? '256' : '4096',...(spec.reasoningEffort?{'reasoning-effort':spec.reasoningEffort}:{}),...(spec.configDirectory?{'config-dir':spec.configDirectory}:{}) },
   stderr: message => emit('stderr', message),

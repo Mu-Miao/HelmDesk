@@ -4,9 +4,11 @@ SwiftUI / WKWebView 保留现有看板，任务、验证、验收、用量和历
 
 ## 构建与安装
 
-预构建版本见 [Mac 预发布](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.1)。下载 arm64 DMG，打开后将 `HelmDesk.app` 拖到 Applications，再从应用目录启动；ZIP 可直接解压得到同一应用。预构建包内置 Node 和依赖，不需要安装源码工具链。校验值见 Release 附件 `SHA256SUMS`。
+预构建版本见 [Mac 预发布](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.2)。下载 arm64 DMG，打开后将 `HelmDesk.app` 拖到 Applications，再从应用目录启动；ZIP 可直接解压得到同一应用。预构建包内置 Node 和依赖，不需要安装源码工具链。校验值见 Release 附件 `SHA256SUMS`。
 
 **此预发布没有 Developer ID 正式签名或 Apple 公证。** 应用仅有 ad-hoc 本地签名，DMG 本身未签名，macOS 可能阻止首次打开；不能把本地签名完整性检查当作 Gatekeeper 信任或公证通过。正式签名公证仍待办。
+
+preview.2 的应用构建号为 2，修复新版 Qoder CN 自定义供应商模型的完整 ID 解析和只读配置接入。更新前先等待队列空闲并备份数据；替换应用后，通过应用提供的空闲停止/重启入口重启后台服务，再刷新模型目录。后台服务独立运行，仅替换应用文件不会自动更新已经运行的服务。已有自定义模型无需在 HelmDesk 再次填写密钥；选择菜单中标为“自定义”的实际模型即可。供应商密钥若依赖父进程环境变量引用，当前受限执行会拒绝继承该环境。
 
 本机已验证 Apple Silicon。部署目标 macOS 14+，尚未在最低系统或 Intel 设备实测。源码构建需要 Swift 6 工具链、macOS SDK、Git、Node.js 24.15.0 和 npm。Qoder 官方 CLI/App、登录及项目工具链仍为外部前提。
 

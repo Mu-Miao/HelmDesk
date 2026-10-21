@@ -11,6 +11,7 @@ import type { Task } from './types.js';
 import { watchOwnedProcess } from './process.js';
 import type { Sharing } from './sharing.js';
 import {inputRoots} from './task-inputs.js';
+import { providerModelOptions, providerSettingsPath } from './provider-models.js';
 
 export interface Execution {
   finished: Promise<{ code: number | null }>;
@@ -33,7 +34,7 @@ export class QoderExecutor implements Executor {
     const loginRoot=realpathSync(process.env.HELMDESK_QODER_LOGIN_DIR??join(homedir(),'.qoder-cn'));
     const authentication=join(loginRoot,'.auth');
     // Reuse the existing authentication state through a read-only reference, never copy credentials.
-    // All other settings, sessions, plugins, memories, caches and logs stay in agent-config / task tmp.
+    // Settings, sessions, plugins, memories, caches and logs stay in agent-config / task tmp.
     if(existsSync(authentication)) symlinkSync(realpathSync(authentication),join(run.configDirectory,'.auth'),'dir');
     run.authentication={mode:'read-only-existing-login',verified:await verifyAuthenticationReference(join(this.dataDir,'tasks',task.id),authentication,join(run.configDirectory,'.auth'),this.sharing.roots())};
     if(!run.authentication.verified) throw new Error('现有登录的只读引用验证失败；拒绝启动执行者');
@@ -46,6 +47,12 @@ export class QoderExecutor implements Executor {
       symlinkSync(source, alias, 'dir');
       if (!await verifyInputIsolation(join(this.dataDir,'tasks',task.id), [source], [], this.sharing.roots())) throw new Error('自定义模型目录只读隔离未验证');
       run.modelConfiguration = { mode: 'read-only-existing-models', verified: true };
+    } else if (task.model.startsWith('qoder-custom-')) {
+      const source = realpathSync(providerSettingsPath()), alias = join(run.configDirectory, 'provider-settings.json');
+      if (!providerModelOptions(source).some(option => option.id === task.model)) throw new Error('所选自定义模型不存在；拒绝猜测供应商或回退');
+      symlinkSync(source, alias, 'file');
+      if (!await verifyInputIsolation(join(this.dataDir,'tasks',task.id), [loginRoot], [source,alias], this.sharing.roots())) throw new Error('自定义供应商配置只读隔离未验证');
+      run.modelConfiguration = { mode: 'read-only-existing-provider', verified: true };
     }
     return {capabilityRun:run,...await this.prepareInputs(task)};
   }
@@ -66,7 +73,7 @@ export class QoderExecutor implements Executor {
     writeFileSync(specFile, JSON.stringify({ prompt: task.prompt, cwd: task.workspace, runtime: runtime.path, model: task.model, maxTurns:task.maxTurns,reasoningEffort:task.reasoningEffort, mode: task.mode, allowedFiles: task.allowedFiles, gateway, inputs:task.inputRun?.files, configDirectory:task.capabilityRun?.configDirectory }), { mode: 0o600 });
     const worker = fileURLToPath(new URL('./worker.js', import.meta.url));
     const readOnlyRoots=this.sharing?[join(directory,'capabilities'),join(task.capabilityRun!.configDirectory!,'.auth')]:[];
-    if(task.capabilityRun?.modelConfiguration) readOnlyRoots.push(join(task.capabilityRun.configDirectory!,'.models'));
+    if(task.capabilityRun?.modelConfiguration) readOnlyRoots.push(join(task.capabilityRun.configDirectory!,task.capabilityRun.modelConfiguration.mode==='read-only-existing-provider'?'provider-settings.json':'.models'));
     readOnlyRoots.push(...inputRoots(task,this.dataDir));
     const child: ChildProcess = spawn('/usr/bin/sandbox-exec', ['-p', sandboxProfile(directory,this.sharing?.roots(),readOnlyRoots), process.execPath, worker, specFile], {
       cwd: task.workspace, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
