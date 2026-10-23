@@ -4,7 +4,8 @@ import { join, isAbsolute, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { Ajv } from 'ajv';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {compileSharedSchema} from './shared-schema.js';
 import { z } from 'zod';
 import type { Store } from './store.js';
 import type { Task } from './types.js';
@@ -16,10 +17,11 @@ import { errorText, safeJson } from './redact.js';
 
 const id = z.string().regex(/^[a-z][a-z0-9-]{0,47}$/);
 const sharingSchema = z.object({ version:z.literal(1), skills:z.array(z.object({id, path:z.string().min(1), version:z.string().min(1).max(80), approved:z.literal(true)}).strict()).max(20).default([]),
-  servers:z.array(z.object({id, source:z.string().min(1).max(300), approved:z.literal(true), command:z.string().min(1), args:z.array(z.string()).max(30).default([]), readRoots:z.array(z.string().min(1)).max(15).default([]), tools:z.array(z.string().regex(/^[A-Za-z0-9_-]{1,80}$/)).max(20), envFrom:z.array(z.string().regex(/^[A-Z][A-Z0-9_]*$/)).max(10).default([])}).strict()).max(10).default([])
+  servers:z.array(z.object({id, source:z.string().min(1).max(300), approved:z.literal(true), command:z.string().min(1), args:z.array(z.string()).max(30).default([]), readRoots:z.array(z.string().min(1)).max(15).default([]), tools:z.array(z.string().regex(/^[A-Za-z0-9_-]{1,80}$/)).max(20), envFrom:z.array(z.string().regex(/^[A-Z][A-Z0-9_]*$/)).max(10).default([])}).strict()).max(10).default([]),
+  remoteServers:z.array(z.object({id,source:z.string().min(1).max(300),approved:z.literal(true),url:z.literal('https://mcp.context7.com/mcp'),tools:z.array(z.enum(['resolve-library-id','query-docs'])).min(1).max(2)}).strict()).max(1).default([]),
+  defaults:z.object({agents:z.array(z.enum(['qoder-cn','antigravity'])).max(2),skills:z.array(id).max(20),tools:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}\/[A-Za-z0-9_-]{1,80}$/)).max(20)}).strict().optional()
 }).strict();
-type ServerSource = z.infer<typeof sharingSchema>['servers'][number];
-const ajv = new Ajv({strict:false,allErrors:false});
+type ServerSource = z.infer<typeof sharingSchema>['servers'][number] | z.infer<typeof sharingSchema>['remoteServers'][number];
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const forbiddenTools = /(^|_)(task_brief_get|task_briefs_list|tasks_watch|task_submit|task_cancel|task_review|task_integration_check|task_patch_export|task_revision_prepare|task_revision_submit|model_preference_set|execution_policy_set|exec|execute|shell|bash|write|delete|remove|install|send|publish|memory)(_|$)/i;
 interface Session { token:string; run:CapabilityRun; snapshotRoot:string; clients:Map<string,Client>; tools:Map<string,SharedTool>; calls:number; closed:boolean; busy:boolean; }
@@ -34,25 +36,39 @@ export class Sharing {
     this.configPath=join(store.directory,'sharing.json');
     const raw=existsSync(this.configPath)?readFileSync(this.configPath,'utf8'):'{"version":1}';
     this.configuration=sharingSchema.parse(JSON.parse(raw)); this.configHash=digest(raw);
-    const ids=[...this.configuration.skills.map(s=>s.id),...this.configuration.servers.map(s=>s.id)];
+    const ids=[...this.configuration.skills.map(s=>s.id),...this.sources().map(s=>s.id)];
     if(new Set(ids).size!==ids.length) throw new Error('共享来源 ID 重复');
+    const defaults=this.configuration.defaults;
+    if(defaults) {
+      if([defaults.agents,defaults.skills,defaults.tools].some(values=>new Set(values).size!==values.length)) throw Error('共享默认值重复');
+      if(defaults.skills.some(id=>!this.configuration.skills.some(s=>s.id===id))||defaults.tools.some(id=>!this.sources().some(s=>s.tools.some(t=>`${s.id}/${t}`===id)))) throw Error('共享默认值必须来自已批准目录');
+    }
     for(const source of this.configuration.servers) {
-      if(!isAbsolute(source.command) || !lstatSync(source.command).isFile()) throw new Error('本地 MCP 必须使用明确的可执行文件绝对路径');
-      if(realpathSync(source.command)!==realpathSync(process.execPath)||!source.args[0]||!isAbsolute(source.args[0])||!/[.](mjs|cjs|js)$/.test(source.args[0])) throw new Error('首版本地 MCP 仅支持 Node 和明确的脚本入口，不运行 npx 安装器或 Shell');
+      const command=source.command==='node'?process.execPath:source.command;
+      if(!isAbsolute(command) || !lstatSync(command).isFile()) throw new Error('本地 MCP 必须使用当前服务的 node 或明确的可执行文件绝对路径');
+      if(realpathSync(command)!==realpathSync(process.execPath)||!source.args[0]||!isAbsolute(source.args[0])||!/[.](mjs|cjs|js)$/.test(source.args[0])) throw new Error('首版本地 MCP 仅支持 Node 和明确的脚本入口，不运行 npx 安装器或 Shell');
       if(source.readRoots.some(path=>!isAbsolute(path)||['/',homedir(),store.directory].includes(realpathSync(path)))) throw new Error('MCP 只允许明确且有限的代码资源目录');
       if(source.envFrom.some(key=>/^(NODE_|DYLD_|LD_|QODER|QODERCN|HELMDESK|HOME$|PATH$)/.test(key))) throw new Error('MCP 不允许继承运行控制或执行者认证变量');
       if(source.tools.some(tool=>forbiddenTools.test(tool))) throw new Error('第一版网关只共享选定的只读工具，不允许派活、执行、写入或通信工具');
     }
   }
+  private sources():ServerSource[] {return [...this.configuration.servers,...this.configuration.remoteServers];}
+  selection(agent:string,mode:string,explicit?:CapabilitySelection):CapabilitySelection {
+    this.checkConfig();
+    if(explicit) return {skills:[...explicit.skills],tools:[...explicit.tools]};
+    const defaults=this.configuration.defaults;
+    return mode!=='probe'&&defaults?.agents.some(id=>id===agent)?{skills:[...defaults.skills],tools:[...defaults.tools]}:{skills:[],tools:[]};
+  }
   roots() { return protectedSourceRoots([...this.configuration.skills.map(s=>s.path),...this.configuration.servers.map(s=>dirname(s.args[0]!))]); }
   private serverDigest(source:ServerSource) {
+    if('url' in source)return digest(JSON.stringify(source));
     const entry=source.args[0]!, stat=lstatSync(entry);
     if(!stat.isFile()||stat.isSymbolicLink()||stat.size>2_000_000) throw new Error('MCP 入口必须是小型常规脚本文件');
     return digest(JSON.stringify(source)+readFileSync(entry,'utf8'));
   }
   private redactUpstream(serverId:string,text:string) {
-    const source=this.configuration.servers.find(server=>server.id===serverId);
-    for(const key of source?.envFrom??[]) {const value=process.env[key];if(value) text=text.replaceAll(value,'[REDACTED]');}
+    const source=this.sources().find(server=>server.id===serverId);
+    for(const key of source&&'envFrom'in source?source.envFrom:[]) {const value=process.env[key];if(value) text=text.replaceAll(value,'[REDACTED]');}
     return text;
   }
   private scrubUpstream(serverId:string,value:unknown):unknown {
@@ -62,7 +78,7 @@ export class Sharing {
     return value;
   }
   view():CapabilityCatalog {
-    return this.catalog ?? {enabled:false,direction:'Codex → 选定快照／只读网关 → 执行者',reason:'尚未刷新共享目录；仅使用启动时明确配置的来源，不自动导出 Codex 配置。',sampledAt:new Date().toISOString(),skills:[],servers:[],exclusions:this.exclusions()};
+    return this.catalog ?? {enabled:false,direction:'Codex → 选定快照／只读网关 → 执行者',reason:'尚未刷新共享目录；仅使用启动时明确配置的来源，不自动导出 Codex 配置。',sampledAt:new Date().toISOString(),skills:[],servers:[],defaults:this.configuration.defaults,exclusions:this.exclusions()};
   }
   private exclusions() { return ['不共享领航台派活工具、Shell、写入型 MCP、安装或记忆工作流','应用托管连接器与 OAuth 授权不自动迁移；无正式入口时由 Codex 调用','兼容性分类只是提示；实际权限由任务白名单、网关与 OS 沙箱执行']; }
   private checkConfig() {
@@ -72,11 +88,22 @@ export class Sharing {
   private async connect(source:ServerSource, directory:string, taskDirectory:string) {
     mkdirSync(directory,{recursive:true,mode:0o700});
     const client=new Client({name:'helmdesk-readonly-gateway',version:'0.1.0'});
+    if('url' in source) {
+      // Only this public, credential-free documentation endpoint is supported. No OAuth migration,
+      // arbitrary URLs, redirects, custom headers, inherited credentials or automatic reconnects.
+      const transport=new StreamableHTTPClientTransport(new URL(source.url),{
+        fetch:(url,init)=>{if(String(url)!==source.url)throw Error('远程 MCP 地址不在白名单');return fetch(url,{...init,credentials:'omit',redirect:'error',signal:AbortSignal.any([...(init?.signal?[init.signal]:[]),AbortSignal.timeout(15000)])});},
+        reconnectionOptions:{maxRetries:0,initialReconnectionDelay:1000,maxReconnectionDelay:1000,reconnectionDelayGrowFactor:1}
+      });
+      try{await client.connect(transport,{timeout:10000});return client;}
+      catch{await client.close();throw Error('公开只读 MCP 连接失败；不自动重试或迁移凭据');}
+    }
     const env:Record<string,string>={PATH:process.env.PATH??'/usr/bin:/bin',HOME:directory,TMPDIR:directory,XDG_CACHE_HOME:directory,CI:'1'};
     for(const key of source.envFrom) if(process.env[key]) env[key]=process.env[key]!;
     const protectedRoots=[...protectedSourceRoots(this.configuration.skills.map(s=>s.path)),join(homedir(),'.qoder-cn'),join(homedir(),'.qoderworkcn'),join(homedir(),'.ssh'),join(homedir(),'.aws')];
     const workspace=join(taskDirectory,'workspace');
-    const transport=new StdioClientTransport({command:'/usr/bin/sandbox-exec',args:['-p',mcpSandboxProfile(directory,existsSync(workspace)?workspace:directory,source.readRoots,protectedRoots),realpathSync(source.command),...source.args],env,cwd:directory,stderr:'pipe',maxBufferSize:256_000});
+    const command=source.command==='node'?process.execPath:source.command;
+    const transport=new StdioClientTransport({command:'/usr/bin/sandbox-exec',args:['-p',mcpSandboxProfile(directory,existsSync(workspace)?workspace:directory,source.readRoots,protectedRoots),realpathSync(command),...source.args],env,cwd:directory,stderr:'pipe',maxBufferSize:256_000});
     transport.stderr?.on('data',()=>{}); // Never forward credentials or upstream stderr to the model/UI.
     try { await client.connect(transport,{timeout:10000}); return client; }
     catch(error) { await client.close(); throw new Error('本地 MCP 连接失败（请在宿主检查来源和兼容性）'); }
@@ -88,7 +115,7 @@ export class Sharing {
       if(!tool || tool.annotations?.readOnlyHint!==true || tool.annotations?.destructiveHint===true) throw new Error('选定工具不存在或没有明确只读声明');
       if(forbiddenTools.test(name)) throw new Error('拒绝共享有副作用的工具');
       const text=JSON.stringify(tool.inputSchema); if(text.length>16000 || tool.description && tool.description.length>4000) throw new Error('MCP 工具描述超过限制');
-      ajv.compile(tool.inputSchema);
+      compileSharedSchema(tool.inputSchema);
       return {id:`${source.id}/${name}`,serverId:source.id,name,description:tool.description??name,inputSchema:tool.inputSchema,sourceSha256:this.serverDigest(source)};
     });
   }
@@ -103,13 +130,13 @@ export class Sharing {
       } catch(error) { return {id:source.id,source:resolve(source.path),version:source.version,sha256:'',fileCount:0,bytes:0,status:'blocked' as const,reasons:[errorText(error)]}; }
     });
     const servers:CapabilityCatalog['servers']=[];
-    for(const source of this.configuration.servers) {
+    for(const source of this.sources()) {
       const root=join(this.store.directory,'catalog-mcp',source.id); let client:Client|undefined;
       try {client=await this.connect(source,root,root); servers.push({id:source.id,source:source.source,status:'ready',tools:await this.listTools(client,source)});}
       catch(error) {servers.push({id:source.id,source:source.source,status:'unavailable',reason:errorText(error),tools:[]});}
       finally {await client?.close();}
     }
-    this.catalog={enabled:skills.some(s=>s.status==='compatible')||servers.some(s=>s.status==='ready'),direction:'Codex → 选定快照／只读网关 → 执行者',reason:'仅列出明确选择的来源；每项任务另行选择，默认不共享。',sampledAt:new Date().toISOString(),skills,servers,exclusions:this.exclusions()};
+    this.catalog={enabled:skills.some(s=>s.status==='compatible')||servers.some(s=>s.status==='ready'),direction:'Codex → 选定快照／只读网关 → 执行者',reason:'仅使用启动时批准的来源和共享默认值；显式空选择关闭共享，probe 始终无工具。',sampledAt:new Date().toISOString(),skills,servers,defaults:this.configuration.defaults,exclusions:this.exclusions()};
     this.store.snapshot('capabilities',this.catalog); return this.catalog;
   }
   async select(selection:CapabilitySelection):Promise<Record<string,string>> {
@@ -136,7 +163,7 @@ export class Sharing {
       }
       const serverIds=new Set(selection.tools.map(t=>t.split('/')[0]!));
       for(const serverId of serverIds) {
-        const source=this.configuration.servers.find(s=>s.id===serverId); if(!source) throw new Error('MCP 来源已移除');
+        const source=this.sources().find(s=>s.id===serverId); if(!source) throw new Error('MCP 来源已移除');
         const client=await this.connect(source,join(directory,'mcp',serverId),directory); session.clients.set(serverId,client);
         for(const tool of await this.listTools(client,source)) if(selection.tools.includes(tool.id)) {
           if(digest(JSON.stringify(tool))!==task.capabilityPins?.[tool.id]) throw new Error('MCP 工具描述已变化，请重新创建任务');
@@ -175,7 +202,7 @@ export class Sharing {
       if(action!=='call') throw new Error('网关操作不在白名单');
       const args=z.object({tool:z.string().max(140),arguments:z.record(z.string(),z.unknown())}).strict().parse(input); label=args.tool;
       const tool=session.tools.get(args.tool); if(!tool) throw new Error('MCP 工具不在任务白名单');
-      if(!ajv.validate(tool.inputSchema,args.arguments)) throw new Error('MCP 参数不符合固定 schema');
+      if(!compileSharedSchema(tool.inputSchema)(args.arguments)) throw new Error('MCP 参数不符合固定 schema');
       const result=await session.clients.get(tool.serverId)!.callTool({name:tool.name,arguments:args.arguments},undefined,{timeout:10000});
       if(session.closed) throw new Error('任务网关已撤销');
       const text=safeJson(this.scrubUpstream(tool.serverId,result)); if(text.length>64000) throw new Error('MCP 结果超过大小限制');
@@ -190,7 +217,7 @@ export class Sharing {
     await Promise.allSettled([...session.clients.values()].map(c=>c.close()));
     for(const check of session.run.sourceChecks) {
       try {
-        const source=this.configuration.skills.find(s=>s.id===check.id),server=this.configuration.servers.find(s=>`mcp/${s.id}`===check.id);
+        const source=this.configuration.skills.find(s=>s.id===check.id),server=this.sources().find(s=>`mcp/${s.id}`===check.id);
         check.after=source?readSkillTree(source.path).sha256:server?this.serverDigest(server):digest(existsSync(this.configPath)?readFileSync(this.configPath,'utf8'):'{"version":1}');
         check.unchanged=check.after===check.before;
       } catch(error) {check.unchanged=false;check.error=errorText(error);}

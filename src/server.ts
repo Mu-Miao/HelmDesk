@@ -73,18 +73,21 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       }
       case 'queue_get': return scheduler.queue();
       case 'task_submit': {
-        const input = submissionSchema.parse(args);
+        const parsed = submissionSchema.parse(args);
+        const input={...parsed,mode:parsed.mode??'files'};
         const configurationRevision=desktopConfiguration(store.directory).revision;
         const preference = modelPreference(store);
         const agent=input.agent??preference.agent??'qoder-cn',catalog=await discoverFor(agent);
+        if(agent==='antigravity'&&parsed.mode===undefined) input.mode='shared';
         const requested=input.model??(agent===(preference.agent??'qoder-cn')?preference.model:agent==='antigravity'?modelPreference(store,agent).model:undefined);if(!requested)throw Error('指定其他执行器时须明确选择模型');
         const model = selectModel(catalog.options,requested,input.mode==='probe');
         const reasoningEffort = input.reasoningEffort ?? (agent===(preference.agent??'qoder-cn')&&model.id === preference.model ? preference.reasoningEffort : undefined);
         const maxTurns=input.maxTurns??(agent==='ollama'||agent==='antigravity'?1:executionPolicy(store).maxTurns);
         if(input.mode==='probe'&&(input.capabilities?.skills.length||input.capabilities?.tools.length)) throw new Error('禁用工具的探测任务不能共享能力');
-        const capabilityPins=await sharing.select(input.capabilities??{skills:[],tools:[]});
+        const capabilities=sharing.selection(agent,input.mode,input.capabilities);
+        const capabilityPins=await sharing.select(capabilities);
         if(configurationRevision!==desktopConfiguration(store.directory).revision)throw Error('执行设置在派发准备期间变化，请重新确认后派发');
-        return scheduler.submit({ ...input,agent,maxTurns, model: model.id, modelLabel: model.label, reasoningEffort, capabilityPins });
+        return scheduler.submit({ ...input,agent,maxTurns, model: model.id, modelLabel: model.label, reasoningEffort, capabilities, capabilityPins });
       }
       case 'task_get': return store.get(id());
       case 'task_disposition_set':return store.classifyTask(args);

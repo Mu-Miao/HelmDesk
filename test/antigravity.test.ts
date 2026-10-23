@@ -4,12 +4,19 @@ import {chmodSync,mkdirSync,mkdtempSync,readFileSync,realpathSync,rmSync,writeFi
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {antigravityDefaultModel,antigravityResult,antigravityUsage,detectAntigravity,parseAntigravityModels,prepareAntigravityState,validateAntigravityInit} from '../src/antigravity.js';
-import {antigravitySandboxProfile,validateAntigravityTask} from '../src/antigravity-executor.js';
+import {antigravitySandboxProfile,validateAntigravityTask,validateAntigravityStep} from '../src/antigravity-executor.js';
 import {runCommand} from '../src/qoder.js';
 import {Store} from '../src/store.js';
 import {modelPreference,saveModelPreference} from '../src/model-selection.js';
-import {agentIdSchema,modelPreferenceSchema,executionPolicySchema} from '../src/schema.js';
+import {agentIdSchema,modelPreferenceSchema,executionPolicySchema,submissionSchema} from '../src/schema.js';
 import type {Submission} from '../src/types.js';
+import type {WorkerGateway} from '../src/capability-types.js';
+
+test('MCP parsing preserves an omitted mode so the host can select the agent default',()=>{
+  const input={agent:'antigravity',title:'shared fixture',prompt:'fixture',projectPath:'/fixture',acceptanceCriteria:['fixture']};
+  assert.equal(Object.hasOwn(submissionSchema.parse(input),'mode'),false);
+  for(const mode of ['probe','shared','files'])assert.equal(submissionSchema.parse({...input,mode}).mode,mode);
+});
 
 test('agy model identities come from complete native tab-separated rows',()=>{
   assert.deepEqual(parseAntigravityModels('gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n'),[{id:antigravityDefaultModel,label:'Gemini 3.8 Flash (High)',kind:'platform'}]);
@@ -85,16 +92,47 @@ test('generated agy state contains no host configuration, scripts, MCP or creden
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+test('shared agy grants only selected gateway tools and rejects unrelated or cross-session steps',()=>{
+  const root=mkdtempSync(join(tmpdir(),'helm-agy-shared-'));
+  const gateway:WorkerGateway={url:'http://127.0.0.1:4317/gateway/00000000-0000-0000-0000-000000000000',token:'a'.repeat(64),skills:[{id:'guide',files:['SKILL.md'],source:'/fixture',version:'1',sha256:'b'.repeat(64),fileCount:1,bytes:5}],tools:[]};
+  try {
+    prepareAntigravityState(root,gateway);
+    const settings=JSON.parse(readFileSync(join(root,'antigravity-cli/settings.json'),'utf8'));
+    assert.deepEqual(settings.permissions.allow,['mcp(helm/read_skill)']);
+    assert.ok(settings.permissions.deny.includes('read_file(*)'));
+    assert.ok(settings.permissions.deny.includes('command(*)'));
+    const mcp=JSON.parse(readFileSync(join(root,'config/mcp_config.json'),'utf8'));
+    assert.deepEqual(Object.keys(mcp.mcpServers),['helm']);
+    assert.equal(mcp.mcpServers.helm.command,realpathSync(process.execPath));
+    assert.equal(JSON.stringify(mcp).includes(gateway.token),false);
+    const agent=readFileSync(join(root,'config/agents/helmdesk-helper/agent.md'),'utf8');
+    assert.match(agent,/mcpServers: \[\]\ninheritMcp: true/);
+    const task={mode:'shared',allowedFiles:[],capabilities:{skills:['guide'],tools:[]},maxTurns:1} as unknown as Submission;
+    assert.doesNotThrow(()=>validateAntigravityTask(task));
+    for(const patch of [{allowedFiles:['x']},{inputs:[{taskId:'x',paths:['x']}]},{maxTurns:2}])assert.throws(()=>validateAntigravityTask({...task,...patch} as Submission));
+    const step={conversation_id:'session',step_type:'tool',tool_name:'mcp__helm__read_skill'};
+    assert.doesNotThrow(()=>validateAntigravityStep(step,'session',gateway));
+    const lazy={...step,tool_name:'call_mcp_tool',tool_info:{name:'call_mcp_tool',parameters:{ServerName:'helm',ToolName:'read_skill',Arguments:{skillId:'guide',path:'SKILL.md'}}}};
+    assert.doesNotThrow(()=>validateAntigravityStep(lazy,'session',gateway));
+    for(const parameters of [{ServerName:'other',ToolName:'read_skill'},{ServerName:'helm',ToolName:'call'}])assert.throws(()=>validateAntigravityStep({...lazy,tool_info:{...lazy.tool_info,parameters}},'session',gateway),/未授权/);
+    assert.throws(()=>validateAntigravityStep(step,'other',gateway),/会话/);
+    assert.throws(()=>validateAntigravityStep(step,'session'),/未授权/);
+    for(const tool_name of ['run_command','read_file','mcp__helm__call','mcp__other__read_skill'])assert.throws(()=>validateAntigravityStep({...step,tool_name},'session',gateway),/未授权/);
+    assert.throws(()=>validateAntigravityStep({...step,step_type:'error_message'},'session',gateway),/上游/);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test('agy OS boundary allows task state but refuses host reads, source writes and permission changes',{skip:process.platform!=='darwin'},async()=>{
   const parent=realpathSync(mkdtempSync(join(tmpdir(),'helm-agy-os-'))),directory=join(parent,'task'),workspace=join(directory,'workspace');
   mkdirSync(workspace,{recursive:true});prepareAntigravityState(join(directory,'agy-state'));
   const outside=join(parent,'host-source');writeFileSync(outside,'fixture');
   const source=join(workspace,'project-source');writeFileSync(source,'private project fixture');
-  const settings=join(directory,'agy-state/antigravity-cli/settings.json');
+  const settings=join(directory,'agy-state/antigravity-cli/settings.json'),config=join(directory,'agy-state/config'),projects=join(config,'projects');
   try {
-    const program=`const fs=require('fs');fs.writeFileSync(${JSON.stringify(join(directory,'allowed'))},'ok');let blocked=0;for(const [action,path] of ${JSON.stringify([['read',outside],['read',source],['write',join(workspace,'blocked')],['write',settings]])}){try{if(action==='read')fs.readFileSync(path);else{const fd=fs.openSync(path,fs.constants.O_WRONLY|fs.constants.O_CREAT);fs.closeSync(fd)}process.exit(9)}catch(e){if(!['EPERM','EACCES'].includes(e.code))throw e;blocked++}}console.log(blocked);`;
+    const program=`const fs=require('fs');fs.writeFileSync(${JSON.stringify(join(directory,'allowed'))},'ok');fs.mkdirSync(${JSON.stringify(projects)});fs.writeFileSync(${JSON.stringify(join(projects,'default-cli-project.json'))},'{}');let blocked=0;for(const [action,path] of ${JSON.stringify([['read',outside],['read',source],['write',join(workspace,'blocked')],['write',settings],['write',join(config,'mcp_config.json')],['write',join(config,'agents/helmdesk-helper/agent.md')],['write',join(config,'unauthorized.json')],['rename',config]])}){try{if(action==='read')fs.readFileSync(path);else if(action==='rename')fs.renameSync(path,path+'-moved');else{const fd=fs.openSync(path,fs.constants.O_WRONLY|fs.constants.O_CREAT);fs.closeSync(fd)}process.exit(9)}catch(e){if(!['EPERM','EACCES'].includes(e.code))throw e;blocked++}}console.log(blocked);`;
     const result=await runCommand('/usr/bin/sandbox-exec',['-p',antigravitySandboxProfile(directory,workspace,process.execPath),process.execPath,'-e',program]);
-    assert.equal(result.code,0,result.stderr);assert.equal(result.stdout.trim(),'4');
+    assert.equal(result.code,0,result.stderr);assert.equal(result.stdout.trim(),'8');
+    assert.equal(readFileSync(join(projects,'default-cli-project.json'),'utf8'),'{}');
     assert.equal(readFileSync(outside,'utf8'),'fixture');
     assert.equal(JSON.parse(readFileSync(settings,'utf8')).toolPermission,'strict');
   }finally{rmSync(parent,{recursive:true,force:true});}

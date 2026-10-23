@@ -16,7 +16,7 @@ export interface Submission {
   capabilities?: import('./capability-types.js').CapabilitySelection;
   capabilityPins?: Record<string,string>;
   revision?: import('./revision-types.js').RevisionLink;
-  mode: 'probe' | 'files';
+  mode: 'probe' | 'shared' | 'files';
   timeoutSeconds: number;
 }
 export interface Task extends Submission {

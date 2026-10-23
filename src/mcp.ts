@@ -47,8 +47,8 @@ export async function startMcp(directory: string,autostart=false,concurrency=1) 
     ['task_verify', 'Codex 记录交付验证结果、命令和证据；与执行状态、人工验收分别保存。失败会标记需要返工', z.object({ ...id, status: z.enum(['passed', 'failed', 'not_run']), command: z.string().max(2000).default(''), evidence: z.string().min(1).max(8000) })],
     ['task_review', 'Codex 审查结果后记录验收；不会自动合并。验收通过后依赖任务才会运行', z.object({ ...id, acceptance: z.enum(['accepted', 'changes_requested']), note: z.string().min(1).max(4000) })],
     ['usage_get', '分开返回任务消耗、会话累计和最近账号额度快照；缺失显示不可用，累计值不重复相加', z.object({ taskId: idSchema.optional() })],
-    ['capabilities_list', '查看明确选择的 Skills 与本地只读 MCP 目录、来源摘要、兼容性和排除原因；不会自动扫描 Codex 配置', z.object({})],
-    ['capabilities_refresh', '重新检查启动时批准的共享来源，生成目录与兼容状态；本地 MCP 在受限沙箱内探测，不发起模型请求', z.object({})]
+    ['capabilities_list', '查看明确选择的 Skills 与只读 MCP 目录、来源摘要、兼容性和排除原因；不会自动扫描 Codex 配置', z.object({})],
+    ['capabilities_refresh', '重新检查启动时批准的共享来源，生成目录与兼容状态；本地 MCP 在受限沙箱内探测，远程仅查询批准的公开文档接口，不发起模型请求', z.object({})]
   ] as const;
   for (const [name, description, schema] of tools) server.registerTool(name, { description, inputSchema: schema }, (args: unknown) => call(name, args));
   await server.connect(new StdioServerTransport());

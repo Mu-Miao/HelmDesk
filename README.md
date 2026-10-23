@@ -10,11 +10,11 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 ## 下载 Mac 应用
 
-**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.2/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.2)
+**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.3/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.3)
 
 > **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
 
-本次 **preview.2（应用构建号 2）** 修复 Qoder CN 新版自定义供应商模型接入：完整识别模型 ID，支持已有 `providers` 配置。已通过 `deepseek-v4.1-flash-1017` 的真实对话、隔离文件写入和安装版调用验收。
+本次 **preview.3（应用构建号 3）** 增加 Antigravity 辅助执行器，并让 Qoder 和 Antigravity 共用明确批准的 Skills 快照与只读 MCP。Gemini High 已实际完成共享技能读取、只读加法和 Context7 文档查询并通过宿主验收；共享配置不会替换已保存的默认模型。本机来源与授权须单独配置，安装包不包含个人共享目录、登录凭据或任务记录。preview.2 的 Qoder CN 自定义供应商模型接入继续保留。
 
 1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
 2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。
@@ -161,7 +161,7 @@ node scripts/register-codex-mcp.mjs --apply
 | 沙箱检查不通过 | 查看 `doctor` 中的具体原因，当前只支持 macOS；不跳过隔离强行运行 |
 | 用量是未知 | 上游没有提供该字段；未知不等于零，不能据此判断免费 |
 
-Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。可选的 [Antigravity 辅助执行器](docs/antigravity.md) 使用官方 `agy` CLI 和 Google 账号登录，默认 Gemini 3.8 Flash（High），处理提示词中的分析和摘要；辅助默认值与 Qoder 主要执行器分开保存。
+Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。可选的 [Antigravity 辅助执行器](docs/antigravity.md) 使用官方 `agy` CLI 和 Google 账号登录，默认 Gemini 3.8 Flash（High），处理分析、摘要和共享只读任务；辅助默认值与 Qoder 主要执行器分开保存。`shared` 模式使用已批准的 Skills 快照与只读 MCP，`probe` 保持无工具；Codex 专属连接器与 OAuth 授权不随包迁移。
 
 ## 开发与文档
 
@@ -173,7 +173,7 @@ npm run build
 
 自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
 
-本次发布前本地验证：Node **282 项**、Swift **29 项**通过；类型检查、生产构建、分发包审计通过。自定义 DeepSeek 的精确文本响应、隔离文件写入及安装版 MCP 调用已实测，原任务历史保留，任务文件未发现供应商密钥。包签名完整性、DMG 只读挂载和 ZIP 解压验包另行检查；这些检查不代表 Developer ID 签名、公证、异机兼容或第三方依赖实现审计。远端 CI 状态以 [GitHub Actions](https://github.com/Mu-Miao/HelmDesk/actions) 为准。
+本次发布的验证范围包含 Node **296 项**、Swift **29 项**测试、类型检查、生产构建和分发包审计。Gemini High 的共享 Skill、只读加法与 Context7 调用已有真实网关记录和独立验收，两个执行器的原有默认模型保持不变。包签名完整性、DMG 只读挂载、ZIP 解压验包及打包版 MCP 握手另行核对；这些检查不代表 Developer ID 签名、公证、异机兼容或第三方依赖实现审计。远端 CI 状态以 [GitHub Actions](https://github.com/Mu-Miao/HelmDesk/actions) 为准。
 
 | 文档 | 内容 |
 | --- | --- |

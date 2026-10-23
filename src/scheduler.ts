@@ -48,6 +48,7 @@ export class Scheduler {
     if (input.projectPath.split(sep).some(p => protectedDirectoryNames.has(p.toLowerCase()))) throw new Error('禁止把配置或凭据目录作为任务项目');
     validateScope(input.allowedFiles);
     if (input.mode === 'files' && input.allowedFiles.length === 0) throw new Error('文件任务必须指定允许修改的文件范围');
+    if (input.mode === 'shared' && (input.allowedFiles.length || input.inputs?.length)) throw new Error('共享只读任务不能修改项目或接收文件输入');
     if (input.dependencies.length !== new Set(input.dependencies).size) throw new Error('依赖任务重复');
     for (const id of input.dependencies) this.store.get(id);
     if(input.mode==='probe'&&input.inputs?.length)throw new Error('禁用工具的探测任务不能接收交付输入');

@@ -8,6 +8,8 @@ import {watchOwnedProcess} from './process.js';
 import {errorText} from './redact.js';
 import type {ModelOption} from './model-types.js';
 import type {AgentInfo} from './agent-types.js';
+import type {WorkerGateway} from './capability-types.js';
+import {fileURLToPath} from 'node:url';
 
 export const antigravityDefaultModel = 'gemini-3.8-flash-high';
 export const antigravityAgent = 'helmdesk-helper';
@@ -28,17 +30,19 @@ export function antigravityEnvironment(temporary?: string): NodeJS.ProcessEnv {
 }
 
 /** Generated configuration only; account credentials remain in the OS keychain. */
-export function prepareAntigravityState(root: string) {
+export function prepareAntigravityState(root: string, gateway?:WorkerGateway) {
   const config = join(root, 'config'), cli = join(root, 'antigravity-cli');
   mkdirSync(join(config, 'agents', antigravityAgent), {recursive:true, mode:0o700});
   mkdirSync(cli, {recursive:true, mode:0o700});
-  writeFileSync(join(config, 'mcp_config.json'), JSON.stringify({mcpServers:{}}), {mode:0o600});
+  const descriptor=join(config,'gateway.json');
+  if(gateway)writeFileSync(descriptor,JSON.stringify(gateway),{mode:0o600});
+  writeFileSync(join(config, 'mcp_config.json'), JSON.stringify({mcpServers:gateway?{helm:{command:realpathSync(process.execPath),args:[fileURLToPath(new URL('./shared-mcp.js',import.meta.url)),descriptor]}}:{}}), {mode:0o600});
   writeFileSync(join(cli, 'settings.json'), JSON.stringify({
     model:'Gemini 3.8 Flash (High)', toolPermission:'strict', useG1Credits:false,
     allowNonWorkspaceAccess:false, disableSlashCommands:true, historySize:0,
-    permissions:{deny:['command(*)','unsandboxed(*)','read_file(*)','write_file(*)','read_url(*)','execute_url(*)','mcp(*)']}
+    permissions:{deny:['command(*)','read_file(*)','write_file(*)','read_url(*)','execute_url(*)',...(!gateway?['mcp(*)']:[])],allow:gateway?[...(gateway.skills.length?['mcp(helm/read_skill)']:[]),...(gateway.tools.length?['mcp(helm/call)']:[])]:[]}
   }), {mode:0o600});
-  writeFileSync(join(config, 'agents', antigravityAgent, 'agent.md'), `---\nname: ${antigravityAgent}\ndescription: HelmDesk auxiliary text assistant\nmainAgent: true\nsubagent: false\nmodel: inherit\ntools: []\nmcpServers: []\nskills: []\nplugins: []\ncommandExecutionPolicy: off\n---\nYou are HelmDesk's auxiliary assistant. Codex owns planning and review; Qoder owns primary implementation. Answer only from the supplied prompt. Do not use tools, read or write files, run commands, delegate work, or create scheduled tasks.\n`, {mode:0o600});
+  writeFileSync(join(config, 'agents', antigravityAgent, 'agent.md'), `---\nname: ${antigravityAgent}\ndescription: HelmDesk auxiliary assistant\nmainAgent: true\nsubagent: false\nmodel: inherit\ntools: []\nmcpServers: []\ninheritMcp: ${!!gateway}\nskills: []\nplugins: []\ncommandExecutionPolicy: off\n---\nYou are HelmDesk's auxiliary assistant. Codex owns planning and review; Qoder owns primary implementation. ${gateway?'Use only the task-scoped helm MCP gateway for selected skill texts and read-only tools.':'Answer only from the supplied prompt. Do not use tools.'} Do not access project files, run commands, browse the web, delegate work, or create scheduled tasks.\n`, {mode:0o600});
   return root;
 }
 
@@ -74,14 +78,14 @@ export function parseAntigravityModels(text: string): ModelOption[] {
 export async function listAntigravityModels() {
   const root = join(dataDirectory(), 'antigravity', 'catalog');
   prepareAntigravityState(root);
-  const options = parseAntigravityModels(await runAntigravity(['--gemini_dir', root, '--log-file', join(root, 'catalog.log'), 'models']));
+  const options = parseAntigravityModels(await runAntigravity(['--gemini_dir', root, '--log-file', join(root, 'catalog.log'), 'models'],30000));
   return {source:'agy models（本账号实时目录）', sampledAt:new Date().toISOString(), models:options.map(o=>o.id), options,
-    defaultModel:antigravityDefaultModel, availability:'辅助文本任务；沿用系统钥匙串登录，不共享 Skills/MCP、不修改文件、不自动换模型；Google 额度独立记录'};
+    defaultModel:antigravityDefaultModel, availability:'辅助分析与共享只读任务；沿用系统钥匙串登录，不修改项目文件、不自动换模型；Google 额度独立记录'};
 }
 
 export async function detectAntigravity(): Promise<AgentInfo> {
   const runtime = findAntigravity();
-  const base = {id:'antigravity' as const, label:'Antigravity · 辅助', version:null, source:runtime ?? '本机 CLI', modes:['probe'] as ('probe'|'files')[]};
+  const base = {id:'antigravity' as const, label:'Antigravity · 辅助', version:null, source:runtime ?? '本机 CLI', modes:['probe','shared'] as ('probe'|'shared'|'files')[]};
   if (!runtime) return {...base, available:false, reason:'未安装官方 agy CLI'};
   try {
     const version = (await runAntigravity(['--version'])).trim();

@@ -16,8 +16,8 @@ export const submissionSchema = z.object({
   inputs: z.array(z.object({taskId:z.string().uuid(),paths:z.array(z.string().min(1).max(500)).min(1).max(10)}).strict()).max(4).default([]).describe('明确选择已验证且已验收任务的交付文件；固定摘要后作为 .helmdesk-inputs/<任务编号>/<路径> 只读输入，不合并原项目'),
   model: z.string().trim().min(1).max(150).optional().describe('显式指定 CLI 模型名或已有自定义 modelID；省略时使用领航台保存的默认模型'),
   reasoningEffort:reasoningEffortSchema,
-  capabilities: z.object({skills:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}$/)).max(10).default([]),tools:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}\/[A-Za-z0-9_-]{1,80}$/)).max(10).default([])}).strict().optional().describe('从 capabilities_list 选定的技能 ID 与 server/tool ID；默认不共享'),
-  mode: z.enum(['probe', 'files']).default('files'),
+  capabilities: z.object({skills:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}$/)).max(20).default([]),tools:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}\/[A-Za-z0-9_-]{1,80}$/)).max(20).default([])}).strict().optional().describe('从 capabilities_list 选择技能与只读 MCP；省略时继承已批准的共享默认值，显式空数组关闭共享；probe 始终无工具'),
+  mode: z.enum(['probe', 'shared', 'files']).optional().describe('shared 仅使用技能快照与只读 MCP，不开放原生文件工具；省略时 Antigravity 用 shared，其他执行器用 files'),
   timeoutSeconds: z.number().int().min(10).max(600).default(120)
 }).strict().superRefine((value,ctx)=>{if(value.probePurpose&&value.mode!=='probe')ctx.addIssue({code:'custom',message:'模型兼容性探测必须禁用工具'});});
 export const idSchema = z.string().uuid();
