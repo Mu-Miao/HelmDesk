@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 const data=resolve(process.env.HELMDESK_DATA_DIR??'.helmdesk');
 const projectPath=resolve(process.argv[2]??'.helmdesk/antigravity-probe-project');
-const model='gemini-3.8-flash-medium';
+const model='gemini-3.8-flash-high';
 const client=new Client({name:'helmdesk-antigravity-check',version:'1'});
 const transport=new StdioClientTransport({command:process.execPath,args:[resolve('dist/cli.js'),'mcp','--data-dir',data,'--autostart-service','--concurrency','2'],stderr:'pipe'});
 async function call(name,args={}) {
@@ -25,7 +25,7 @@ try {
   assert.deepEqual(await call('model_preference_get'),primary);
   const before=execFileSync('/usr/bin/git',['-C',projectPath,'status','--porcelain'],{encoding:'utf8'});
   assert.equal(before,'','The dedicated probe repository must be clean.');
-  const task=await call('task_submit',{agent:'antigravity',mode:'probe',title:'Gemini 辅助执行器 MCP 连通与用量验收',projectPath,maxTurns:1,timeoutSeconds:120,allowedFiles:[],prompt:'Only reply with exactly HELMDESK_GEMINI_MCP_OK. Do not use any tools, read files, run commands, or schedule work.',acceptanceCriteria:['Gemini 3.8 Flash Medium returns the exact marker','No file changes or tool actions','Google token usage is recorded separately; Qoder primary is unchanged']});
+  const task=await call('task_submit',{agent:'antigravity',mode:'probe',title:'Gemini 辅助执行器 MCP 连通与用量验收',projectPath,maxTurns:1,timeoutSeconds:120,allowedFiles:[],prompt:'Only reply with exactly HELMDESK_GEMINI_MCP_OK. Do not use any tools, read files, run commands, or schedule work.',acceptanceCriteria:['Gemini 3.8 Flash High returns the exact marker','No file changes or tool actions','Google token usage is recorded separately; Qoder primary is unchanged']});
   console.log(JSON.stringify({taskId:task.id,state:task.state}));
   let result;
   for(let i=0;i<3;i++) {
@@ -43,7 +43,7 @@ try {
   assert.equal(usage.task.taskCredits,null);
   assert.equal(usage.task.usd,null);
   assert.equal(usage.account.source,'Antigravity');
-  const evidence='Exact marker returned by gemini-3.8-flash-medium in strict headless mode; task completed with no file changes, dedicated original repository remains clean, Qoder primary unchanged. Google tokens are retained, Credits/USD remain unknown.';
+  const evidence='Exact marker returned by gemini-3.8-flash-high in strict headless mode; task completed with no file changes, dedicated original repository remains clean, Qoder primary unchanged. Google tokens are retained, Credits/USD remain unknown.';
   await call('task_verify',{taskId:task.id,status:'passed',command:'node scripts/antigravity-smoke.mjs <dedicated-probe-repository>',evidence});
   const accepted=await call('task_review',{taskId:task.id,acceptance:'accepted',note:evidence});
   const report={at:new Date().toISOString(),taskId:task.id,state:accepted.state,acceptance:accepted.acceptance,model,primary,auxiliary:await call('model_preference_get',{agent:'antigravity'}),usage,checks:{exactReply:true,noFileChanges:true,primaryUnchanged:true,separateUsage:true}};

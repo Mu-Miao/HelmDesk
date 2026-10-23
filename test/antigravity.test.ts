@@ -12,7 +12,7 @@ import {agentIdSchema,modelPreferenceSchema,executionPolicySchema} from '../src/
 import type {Submission} from '../src/types.js';
 
 test('agy model identities come from complete native tab-separated rows',()=>{
-  assert.deepEqual(parseAntigravityModels('gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n'),[{id:antigravityDefaultModel,label:'Gemini 3.8 Flash (Medium)',kind:'platform'}]);
+  assert.deepEqual(parseAntigravityModels('gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n'),[{id:antigravityDefaultModel,label:'Gemini 3.8 Flash (High)',kind:'platform'}]);
   for(const text of ['', 'Fetching models...', 'model Model', '-flag\tBad','gemini\tOne\ngemini\tTwo','model\tlabel\tsecret'])assert.throws(()=>parseAntigravityModels(text));
 });
 
@@ -30,7 +30,7 @@ test('auxiliary preferences survive restart without replacing the Qoder primary'
   let store=new Store(directory);
   try {
     saveModelPreference(store,[{id:'primary',label:'Primary',kind:'custom'}],'primary');
-    saveModelPreference(store,parseAntigravityModels(`${antigravityDefaultModel}\tGemini 3.8 Flash (Medium)`),antigravityDefaultModel,undefined,'antigravity');
+    saveModelPreference(store,parseAntigravityModels(`${antigravityDefaultModel}\tGemini 3.8 Flash (High)`),antigravityDefaultModel,undefined,'antigravity');
     assert.equal(modelPreference(store).model,'primary');
     assert.equal(modelPreference(store,'antigravity').model,antigravityDefaultModel);
     store.close();store=new Store(directory);

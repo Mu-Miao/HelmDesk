@@ -5,7 +5,7 @@ import type {AgentId} from './agent-types.js';
 import {antigravityDefaultModel} from './antigravity.js';
 export function modelPreference(store: Store, agent?:AgentId): ModelPreference {
   const primary=store.snapshot('modelPreference') as ModelPreference | null;
-  const preference=(agent&&agent!==(primary?.agent??'qoder-cn')?store.snapshot(`modelPreference:${agent}`) as ModelPreference|null:primary) ?? (agent==='antigravity'?{agent,model:antigravityDefaultModel,label:'Gemini 3.8 Flash (Medium)',kind:'platform' as const,updatedAt:null}:{agent,model:'Auto',label:'Auto',kind:'platform' as const,updatedAt:null});
+  const preference=(agent&&agent!==(primary?.agent??'qoder-cn')?store.snapshot(`modelPreference:${agent}`) as ModelPreference|null:primary) ?? (agent==='antigravity'?{agent,model:antigravityDefaultModel,label:'Gemini 3.8 Flash (High)',kind:'platform' as const,updatedAt:null}:{agent,model:'Auto',label:'Auto',kind:'platform' as const,updatedAt:null});
   return {...preference,reasoningEffort:preference.agent&&preference.agent!=='qoder-cn'?undefined:resolveReasoningEffort(preference.model,preference.reasoningEffort)};
 }
 export function selectModel(options: ModelOption[], requested: string,allowFailedProbe=false): ModelOption {

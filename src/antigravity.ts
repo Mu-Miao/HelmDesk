@@ -9,7 +9,7 @@ import {errorText} from './redact.js';
 import type {ModelOption} from './model-types.js';
 import type {AgentInfo} from './agent-types.js';
 
-export const antigravityDefaultModel = 'gemini-3.8-flash-medium';
+export const antigravityDefaultModel = 'gemini-3.8-flash-high';
 export const antigravityAgent = 'helmdesk-helper';
 
 export function findAntigravity(): string | null {
@@ -34,7 +34,7 @@ export function prepareAntigravityState(root: string) {
   mkdirSync(cli, {recursive:true, mode:0o700});
   writeFileSync(join(config, 'mcp_config.json'), JSON.stringify({mcpServers:{}}), {mode:0o600});
   writeFileSync(join(cli, 'settings.json'), JSON.stringify({
-    model:'Gemini 3.8 Flash (Medium)', toolPermission:'strict', useG1Credits:false,
+    model:'Gemini 3.8 Flash (High)', toolPermission:'strict', useG1Credits:false,
     allowNonWorkspaceAccess:false, disableSlashCommands:true, historySize:0,
     permissions:{deny:['command(*)','unsandboxed(*)','read_file(*)','write_file(*)','read_url(*)','execute_url(*)','mcp(*)']}
   }), {mode:0o600});
@@ -87,7 +87,7 @@ export async function detectAntigravity(): Promise<AgentInfo> {
     const version = (await runAntigravity(['--version'])).trim();
     const help = await runAntigravity(['--help'],15000,true);
     if (!/^\d+\.\d+\.\d+$/.test(version) || !['--input-format','--output-format','--agent','--disable-slash-commands'].every(flag=>help.includes(flag))) throw Error('CLI 缺少受限执行接口');
-    return {...base, version, available:true, reason:'辅助分析与摘要；默认 Gemini 3.8 Flash（Medium）；登录、模型权限以实时目录与实际调用为准'};
+    return {...base, version, available:true, reason:'辅助分析与摘要；默认 Gemini 3.8 Flash（High）；登录、模型权限以实时目录与实际调用为准'};
   } catch (error) {return {...base, available:false, reason:errorText(error)};}
 }
 

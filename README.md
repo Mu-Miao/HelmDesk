@@ -161,7 +161,7 @@ node scripts/register-codex-mcp.mjs --apply
 | 沙箱检查不通过 | 查看 `doctor` 中的具体原因，当前只支持 macOS；不跳过隔离强行运行 |
 | 用量是未知 | 上游没有提供该字段；未知不等于零，不能据此判断免费 |
 
-Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。可选的 [Antigravity 辅助执行器](docs/antigravity.md) 使用官方 `agy` CLI 和 Google 账号登录，默认 Gemini 3.8 Flash（Medium），处理提示词中的分析和摘要；辅助默认值与 Qoder 主要执行器分开保存。
+Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。可选的 [Antigravity 辅助执行器](docs/antigravity.md) 使用官方 `agy` CLI 和 Google 账号登录，默认 Gemini 3.8 Flash（High），处理提示词中的分析和摘要；辅助默认值与 Qoder 主要执行器分开保存。
 
 ## 开发与文档
 

@@ -1,12 +1,12 @@
 # Antigravity 辅助执行器
 
-Codex 负责拆解、统筹、验证和验收；Qoder 是主要执行器；Antigravity 处理提示词中的独立分析、摘要、解释和建议。Antigravity 默认模型为 `gemini-3.8-flash-medium`，保存辅助默认值不会替换主要执行器。它不会自动接管失败或额度耗尽的 Qoder 任务。
+Codex 负责拆解、统筹、验证和验收；Qoder 是主要执行器；Antigravity 处理提示词中的独立分析、摘要、解释和建议。Antigravity 默认模型为 `gemini-3.8-flash-high`，保存辅助默认值不会替换主要执行器。它不会自动接管失败或额度耗尽的 Qoder 任务。
 
 ## 安装与登录
 
 使用 Google 官方 [安装说明](https://antigravity.google/docs/getting-started?tab=cli) 安装 `agy`，运行 `agy` 并通过 Google OAuth 登录。HelmDesk 复用 macOS 钥匙串登录，不保存 Google OAuth token 或把订阅转成 API Key。CLI 路径可通过 `HELMDESK_AGY_CLI` 明确指定，默认也检查 `~/.local/bin/agy`。
 
-`agents_list` 只探测安装；`models_list` 带 `agent: "antigravity"` 时读取当前账号的完整模型目录，不发送推理请求。模型不存在时拒绝派发，不自动改用其他档位。默认模型的 Medium 是模型 ID 的一部分，与 Qoder 的 `reasoningEffort` 参数分开。
+`agents_list` 只探测安装；`models_list` 带 `agent: "antigravity"` 时读取当前账号的完整模型目录，不发送推理请求。模型不存在时拒绝派发，不自动改用其他档位。默认模型的 High 是模型 ID 的一部分，与 Qoder 的 `reasoningEffort` 参数分开。
 
 ## 派发
 
