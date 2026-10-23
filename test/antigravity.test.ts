@@ -89,11 +89,12 @@ test('agy OS boundary allows task state but refuses host reads, source writes an
   const parent=realpathSync(mkdtempSync(join(tmpdir(),'helm-agy-os-'))),directory=join(parent,'task'),workspace=join(directory,'workspace');
   mkdirSync(workspace,{recursive:true});prepareAntigravityState(join(directory,'agy-state'));
   const outside=join(parent,'host-source');writeFileSync(outside,'fixture');
+  const source=join(workspace,'project-source');writeFileSync(source,'private project fixture');
   const settings=join(directory,'agy-state/antigravity-cli/settings.json');
   try {
-    const program=`const fs=require('fs');fs.writeFileSync(${JSON.stringify(join(directory,'allowed'))},'ok');let blocked=0;for(const [action,path] of ${JSON.stringify([['read',outside],['write',join(workspace,'blocked')],['write',settings]])}){try{if(action==='read')fs.readFileSync(path);else{const fd=fs.openSync(path,fs.constants.O_WRONLY|fs.constants.O_CREAT);fs.closeSync(fd)}process.exit(9)}catch(e){if(!['EPERM','EACCES'].includes(e.code))throw e;blocked++}}console.log(blocked);`;
+    const program=`const fs=require('fs');fs.writeFileSync(${JSON.stringify(join(directory,'allowed'))},'ok');let blocked=0;for(const [action,path] of ${JSON.stringify([['read',outside],['read',source],['write',join(workspace,'blocked')],['write',settings]])}){try{if(action==='read')fs.readFileSync(path);else{const fd=fs.openSync(path,fs.constants.O_WRONLY|fs.constants.O_CREAT);fs.closeSync(fd)}process.exit(9)}catch(e){if(!['EPERM','EACCES'].includes(e.code))throw e;blocked++}}console.log(blocked);`;
     const result=await runCommand('/usr/bin/sandbox-exec',['-p',antigravitySandboxProfile(directory,workspace,process.execPath),process.execPath,'-e',program]);
-    assert.equal(result.code,0,result.stderr);assert.equal(result.stdout.trim(),'3');
+    assert.equal(result.code,0,result.stderr);assert.equal(result.stdout.trim(),'4');
     assert.equal(readFileSync(outside,'utf8'),'fixture');
     assert.equal(JSON.parse(readFileSync(settings,'utf8')).toolPermission,'strict');
   }finally{rmSync(parent,{recursive:true,force:true});}

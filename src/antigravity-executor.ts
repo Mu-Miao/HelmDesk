@@ -16,10 +16,11 @@ export function validateAntigravityTask(task: Submission) {
 
 export function antigravitySandboxProfile(directory:string, workspace:string, runtime:string) {
   const state=join(directory,'agy-state');
-  const protectedRoots=protectedSourceRoots([join(homedir(),'.gemini'),join(homedir(),'.qoder-cn')]);
+  const protectedRoots=protectedSourceRoots([join(homedir(),'.gemini'),join(homedir(),'.qoder-cn'),workspace]);
   const reads=['/System','/usr','/Library','/private/etc','/private/var/db','/dev',directory,dirname(runtime),join(homedir(),'Library/Keychains'),join(homedir(),'Library/Preferences/com.apple.security.plist')].map(p=>existsSync(p)?realpathSync(p):p);
   const immutable=[workspace,join(state,'config/agents'),join(state,'config/mcp_config.json'),join(state,'antigravity-cli/settings.json')];
-  return sandboxProfile(directory,protectedRoots,immutable)+`\n(deny file-read-data)\n(allow file-read-data (literal "/") ${reads.map(p=>`(subpath ${JSON.stringify(p)})`).join(' ')})\n`;
+  const readable=`(require-all (require-any (literal "/") ${reads.map(p=>`(subpath ${JSON.stringify(p)})`).join(' ')}) ${protectedRoots.map(p=>`(require-not (subpath ${JSON.stringify(p)}))`).join(' ')})`;
+  return sandboxProfile(directory,protectedRoots,immutable)+`\n(deny file-read-data)\n(allow file-read-data ${readable})\n`;
 }
 
 export class AntigravityExecutor implements Executor {
