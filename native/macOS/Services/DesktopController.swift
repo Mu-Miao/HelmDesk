@@ -135,7 +135,7 @@ final class DesktopController {
             let request = ModelRequest(agent: draftAgent, model: draftModel, reasoningEffort: draftAgent == "qoder-cn" && !draftEffort.isEmpty ? draftEffort : nil)
             let saved: DesktopModelPreference = try await service.toolCall("model_preference_set", body: JSONEncoder().encode(request))
             draftEffort = saved.reasoningEffort ?? ""
-            message = "默认模型已保存，仅用于后续任务；已有任务保持原设置。"
+            message = draftAgent == "antigravity" ? "辅助默认模型已保存；主要执行器保持原设置。" : "默认模型已保存，仅用于后续任务；已有任务保持原设置。"
         }
     }
 }

@@ -37,6 +37,7 @@ xcuserdata/
 !/docs/sharing.example.json
 !/docs/v0.1日常使用与验收.md
 !/docs/quickstart.md
+!/docs/antigravity.md
 !/docs/macos-install.md
 !/docs/macos-roadmap.md
 !/docs/release-checklist.md
@@ -47,5 +48,6 @@ xcuserdata/
 /scripts/*
 !/scripts/register-codex-mcp.mjs
 !/scripts/check-publication.mjs
+!/scripts/antigravity-smoke.mjs
 !/scripts/audit-macos-bundle.mjs
 !/scripts/fixtures/

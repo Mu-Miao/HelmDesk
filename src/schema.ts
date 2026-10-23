@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { flashEfforts } from './reasoning.js';
 export const reasoningEffortSchema = z.enum(flashEfforts).optional().describe('Flash 支持 low、medium、xhigh；省略时继承领航台默认设置。每次请求按官方目录校验，不降档');
-export const agentIdSchema=z.enum(['qoder-cn','ollama']);
-export const modelPreferenceSchema = z.object({agent:agentIdSchema.optional(),model:z.string().trim().min(1).max(150),reasoningEffort:reasoningEffortSchema}).strict();
+export const agentIdSchema=z.enum(['qoder-cn','ollama','antigravity']);
+export const modelPreferenceSchema = z.object({agent:agentIdSchema.optional(),model:z.string().trim().min(1).max(150),reasoningEffort:reasoningEffortSchema,makePrimary:z.boolean().optional().describe('false 只保存该执行器的默认模型，不改变主要执行器；辅助 Antigravity 默认 false')}).strict();
 export const submissionSchema = z.object({
   agent:agentIdSchema.optional(),
   maxTurns:z.number().int().min(1).max(100).optional().describe('明确请求最大执行轮数；Qoder 通过官方 SDK 传入，Ollama 无工具任务只允许 1 轮'),

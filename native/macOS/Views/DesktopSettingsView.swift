@@ -139,6 +139,7 @@ struct DesktopSettingsView: View {
         Section("模型默认值") {
             Picker("执行器", selection: $controller.draftAgent) {
                 Text("Qoder CN").tag("qoder-cn")
+                Text("Antigravity · 辅助").tag("antigravity")
                 Text("Ollama").tag("ollama")
             }
             .pickerStyle(.segmented)
@@ -171,7 +172,7 @@ struct DesktopSettingsView: View {
                     Text("当前模型不在所选代理的目录中。").foregroundStyle(.secondary)
                 }
             }
-            Text("保存的默认值只影响之后新建的任务，已有任务保留各自模型。").foregroundStyle(.secondary)
+            Text(controller.draftAgent == "antigravity" ? "辅助模型用于 Codex 明确派发的文本任务，保存后主要执行器保持原设置。" : "保存的默认值只影响之后新建的任务，已有任务保留各自模型。").foregroundStyle(.secondary)
         }
     }
 
