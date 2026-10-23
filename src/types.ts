@@ -16,7 +16,7 @@ export interface Submission {
   capabilities?: import('./capability-types.js').CapabilitySelection;
   capabilityPins?: Record<string,string>;
   revision?: import('./revision-types.js').RevisionLink;
-  mode: 'probe' | 'files';
+  mode: 'probe' | 'shared' | 'files';
   timeoutSeconds: number;
 }
 export interface Task extends Submission {
@@ -30,7 +30,7 @@ export interface Task extends Submission {
   workspace?: string; baseline?: string; workspaceKind?: 'worktree' | 'copy';
   pid?: number; summary?: string; error?: string; failureKind?: string;
   requestedModel: string; reportedModel?: string; sessionId?: string;
-  usage?: { taskCredits: number | null; sessionCredits: number | null; inputTokens: number | null; outputTokens: number | null; usd: number | null; tokenNote: string; source: string };
+  usage?: { taskCredits: number | null; sessionCredits: number | null; inputTokens: number | null; outputTokens: number | null; thinkingTokens?:number|null;cacheReadTokens?:number|null;totalTokens?:number|null; usd: number | null; tokenNote: string; source: string };
   changes?: { path: string; kind: string; diff: string; sha256?:string; bytes?:number; beforeSha256?:string; beforeBytes?:number }[];
   reviewNote?: string;
   verification?: { status: 'passed' | 'failed' | 'not_run'; command: string; evidence: string; recordedAt: string; deliveryVersion?: string };

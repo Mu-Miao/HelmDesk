@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ProjectModelUsage, ProjectSummary, RecordedMetric } from '../../src/project-types.js';
+import {agentName} from '../../src/agent-types.js';
 
 const COUNT_LABELS: [keyof ProjectSummary['counts'], string][] = [
   ['total', '总计'],
@@ -42,7 +43,7 @@ function ProjectModel({ model }: { model: ProjectModelUsage }): React.JSX.Elemen
         {/* 名称（含 Auto）原样展示，不翻译、不推断厂商 */}
         <span className="project-model-name">{model.id === 'Auto' ? 'Auto' : model.label || model.id}</span>
         <span className="project-model-kind">{model.kind === 'custom' ? '自定义' : '平台'}</span>
-        {model.agent ? <span className="project-model-kind">{model.agent==='ollama'?'Ollama 本地':model.agent}</span> : null}
+        {model.agent ? <span className="project-model-kind">{agentName(model.agent)}</span> : null}
       </p>
       {model.kind === 'custom' ? <code className="project-model-id">{model.id}</code> : null}
       <Metric label="任务 Credits" metric={model.credits} taskCount={model.taskCount} />

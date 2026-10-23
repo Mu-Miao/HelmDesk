@@ -1,7 +1,7 @@
 /** Shared project boundary: these host/account directories never enter model workspaces. */
 export const protectedDirectoryNames = new Set([
   '.aws', '.codex', '.agents', '.qoder', '.qoder-cn', '.qoderworkcn', '.ssh',
-  '.auth', '.models', '.gnupg', '.azure', '.kube', '.docker',
+  '.auth', '.models', '.gnupg', '.azure', '.kube', '.docker', '.gemini', '.antigravity', '.arkcli', '.arkcli-bytecloud',
 ]);
 
 export function protectedProjectEntry(name: string) {

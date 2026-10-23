@@ -14,6 +14,7 @@ import {taskBudget} from './execution-policy.js';
 import {validateOllamaTask} from './ollama-executor.js';
 import {deliveryVersion,assertDeliveryVersion,assertVerifiedDelivery} from './verified-delivery.js';
 import {protectedDirectoryNames} from './protected-paths.js';
+import {validateAntigravityTask} from './antigravity-executor.js';
 
 interface ActiveTask { id:string; execution?:Execution; cancelled:boolean }
 
@@ -39,13 +40,15 @@ export class Scheduler {
     const previous=receipt?this.store.requestTask(receipt.key,receipt.hash):null;
     if(previous)return previous;
     if(input.agent==='ollama')validateOllamaTask(input as Task);
-    input={...input,reasoningEffort:input.agent==='ollama'?undefined:resolveReasoningEffort(input.model,input.reasoningEffort)};
+    if(input.agent==='antigravity')validateAntigravityTask(input);
+    input={...input,reasoningEffort:input.agent&&input.agent!=='qoder-cn'?undefined:resolveReasoningEffort(input.model,input.reasoningEffort)};
     if (!isAbsolute(input.projectPath) || !statSync(input.projectPath).isDirectory()) throw new Error('项目路径必须是存在的绝对目录');
     input = { ...input, projectPath: realpathSync(input.projectPath) };
     if (!this.allowedRoots.some(value => { const root = existsSync(value) ? realpathSync(value) : resolve(value); return input.projectPath === root || input.projectPath.startsWith(root + sep); })) throw new Error('项目路径不在领航台启动时允许的根目录中；请通过 HELMDESK_PROJECT_ROOTS 明确配置');
     if (input.projectPath.split(sep).some(p => protectedDirectoryNames.has(p.toLowerCase()))) throw new Error('禁止把配置或凭据目录作为任务项目');
     validateScope(input.allowedFiles);
     if (input.mode === 'files' && input.allowedFiles.length === 0) throw new Error('文件任务必须指定允许修改的文件范围');
+    if (input.mode === 'shared' && (input.allowedFiles.length || input.inputs?.length)) throw new Error('共享只读任务不能修改项目或接收文件输入');
     if (input.dependencies.length !== new Set(input.dependencies).size) throw new Error('依赖任务重复');
     for (const id of input.dependencies) this.store.get(id);
     if(input.mode==='probe'&&input.inputs?.length)throw new Error('禁用工具的探测任务不能接收交付输入');
@@ -128,10 +131,10 @@ export class Scheduler {
     }
   }
   private recordUsage(id:string,result:any) {
-    const local=this.store.get(id).agent==='ollama';
+    const agent=this.store.get(id).agent,local=agent==='ollama',google=agent==='antigravity';
     const numeric=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;
     const credits=numeric(result.total_credits);
-    this.store.patch(id,{sessionId:result.session_id,usage:{taskCredits:local?null:credits,sessionCredits:local?null:credits,inputTokens:numeric(result.usage?.input_tokens),outputTokens:numeric(result.usage?.output_tokens),usd:local?null:numeric(result.total_cost_usd),tokenNote:local?'Tokens 来自本地服务完成事件；CLI 未提供 Credits 或货币金额，保留未知':'CLI 返回的 0 不代表没有消耗 Tokens；美元为 0 不代表未扣 Credits',source:local?'official-ollama.generate；单次本地 CLI 请求':'official-sdk.result；本任务为新建单会话，累计值只记录一次'}});
+    this.store.patch(id,{sessionId:result.session_id,usage:{taskCredits:local||google?null:credits,sessionCredits:local||google?null:credits,inputTokens:numeric(result.usage?.input_tokens),outputTokens:numeric(result.usage?.output_tokens),usd:local||google?null:numeric(result.total_cost_usd),...(google?{thinkingTokens:numeric(result.antigravityUsage?.thinkingTokens),cacheReadTokens:numeric(result.antigravityUsage?.cacheReadTokens),totalTokens:numeric(result.antigravityUsage?.totalTokens)}:{}),tokenNote:google?'Tokens 来自 agy 完成事件；Google 套餐额度与 Qoder Credits 分开，费用未提供，保留未知':local?'Tokens 来自本地服务完成事件；CLI 未提供 Credits 或货币金额，保留未知':'CLI 返回的 0 不代表没有消耗 Tokens；美元为 0 不代表未扣 Credits',source:google?'official-agy.result；本任务为新建单轮会话':local?'official-ollama.generate；单次本地 CLI 请求':'official-sdk.result；本任务为新建单会话，累计值只记录一次'}});
   }
   cancel(id: string) {
     const task = this.store.get(id);
