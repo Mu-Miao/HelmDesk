@@ -4,11 +4,11 @@ SwiftUI / WKWebView 保留现有看板，任务、验证、验收、用量和历
 
 ## 构建与安装
 
-预构建版本见 [Mac 预发布](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.3)。下载 arm64 DMG，打开后将 `HelmDesk.app` 拖到 Applications，再从应用目录启动；ZIP 可直接解压得到同一应用。预构建包内置 Node 和依赖，不需要安装源码工具链。校验值见 Release 附件 `SHA256SUMS`。
+预构建版本见 [Mac 预发布](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.4)。下载 arm64 DMG，打开后将 `HelmDesk.app` 拖到 Applications，再从应用目录启动；ZIP 可直接解压得到同一应用。预构建包内置 Node 和依赖，不需要安装源码工具链。校验值见 Release 附件 `SHA256SUMS`。
 
 **此预发布没有 Developer ID 正式签名或 Apple 公证。** 应用仅有 ad-hoc 本地签名，DMG 本身未签名，macOS 可能阻止首次打开；不能把本地签名完整性检查当作 Gatekeeper 信任或公证通过。正式签名公证仍待办。
 
-preview.3 的应用构建号为 3，增加 Antigravity 辅助执行器及两个执行器共用的 Skills 快照、只读 MCP 网关，保留 preview.2 的自定义供应商模型接入。Antigravity 需另装官方 `agy` CLI 并登录；`shared` 模式仅开放已批准的共享能力，`probe` 无工具。共享默认值和来源在当前数据目录的 `sharing.json` 单独配置，见 [辅助执行器说明](antigravity.md)；个人配置不包含在下载包中，更新不替换已保存的模型偏好。
+preview.4 的应用构建号为 4，增加 ZCode 辅助执行器，保留 Antigravity、共享 Skills 快照与只读 MCP，以及自定义供应商模型接入。Antigravity 需另装官方 `agy` CLI 并登录；`shared` 模式仅开放已批准的共享能力，`probe` 无工具。共享默认值和来源在当前数据目录的 `sharing.json` 单独配置，见 [辅助执行器说明](antigravity.md)；个人配置不包含在下载包中，更新不替换已保存的模型偏好。
 
 更新前先等待队列空闲并备份数据；替换应用后，通过应用提供的空闲停止/重启入口重启后台服务，再刷新模型目录。后台服务独立运行，仅替换应用文件不会自动更新已经运行的服务。若 Codex 仍显示旧版工具参数，重新连接 HelmDesk MCP 后再使用 `shared` 模式。已有自定义模型无需在 HelmDesk 再次填写密钥；选择菜单中标为“自定义”的实际模型即可。供应商密钥若依赖父进程环境变量引用，当前受限执行会拒绝继承该环境。
 
@@ -66,3 +66,9 @@ npm ci --ignore-scripts
 网页访问由应用签发 60 秒、仅可交换一次的入口票据；票据放在 URL fragment，页面读取后立即清除。点击应用“浏览器”会为该浏览器重新生成入口，不复用原生窗口已使用的票据。永久服务令牌不进入网页。直接输入端口地址不会建立新会话；源码用户可在交互终端运行 `node dist/cli.js browser --data-dir .helmdesk`。服务重启后须从应用重新打开，普通页面刷新仍可复用有效会话。
 
 交换后的网页凭据只保存在该来源的 `sessionStorage`（存储不可用时仅保存在页面内存），通过显式请求头用于 API 和实时事件，不使用 Cookie 认证。不同端口之间不会自动携带凭据。网页会话最长 12 小时，关闭标签页或会话失效后，从应用重新打开；原生管理仍单独要求私有服务身份。
+
+## ZCode 辅助执行器
+
+安装并登录官方 ZCode App 后，在原生设置或网页模型设置中选择“ZCode · GLM 辅助”，刷新目录并保存 `GLM-5.3-Flash`。此默认值独立保存；Qoder 主要执行器保持原设置。也可用 `HELMDESK_ZCODE_CLI` 指定完整官方 CLI 入口。当前验证 CLI 0.17.x / BigModel Start Plan；无需在 HelmDesk 输入 API Key。
+
+本版本的真实 GLM 请求收到上游风控拒绝，已记录并停止重试。自动测试覆盖结构化协议、任务隔离、共享网关和失败处理，不代表该账号已经通过真实模型验收。详见 [ZCode 说明](zcode.md)。

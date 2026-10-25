@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 
 const git=args=>execFileSync('git',args,{maxBuffer:20_000_000});
 const publicRoots=new Set(['.gitignore','.npmrc','AGENTS.md','README.md','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','tsconfig.json','tsconfig.test.json','tsconfig.web.json','vite.config.ts']);
-const antigravityPublicFiles=new Set(['docs/antigravity.md','scripts/antigravity-smoke.mjs']);
+const auxiliaryPublicFiles=new Set(['docs/antigravity.md','docs/zcode.md','scripts/antigravity-smoke.mjs']);
 const publicExtras=new Set(['docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/quickstart.md','docs/macos-install.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs','native/Package.swift','native/Resources/Info.plist','native/Resources/Node-LICENSE.txt','native/Resources/Node-VERSION','script/build_and_run.sh','script/package_macos.sh']);
 const rules=[
   ['private-key',/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/g],
@@ -22,10 +22,10 @@ for(const entry of entries){
   const match=/^(\d+) ([a-f0-9]+) (\d)\t([\s\S]+)$/.exec(entry);
   if(!match)throw Error('Unrecognized index entry');
   const [,mode,sha,stage,path]=match;
-  const blocked=path.split('/').some(p=>/^(?:\.helmdesk|\.env.*|\.git|\.aws|\.codex|\.agents|\.qoder|\.serena|\.build|\.swiftpm|xcuserdata|node_modules|dist|coverage)$/.test(p))||/\.(?:sqlite.*|db|log|pem|key|p12|pfx)$/i.test(path);
+  const blocked=path.split('/').some(p=>/^(?:\.helmdesk|\.env.*|\.git|\.aws|\.codex|\.agents|\.qoder|\.zcode|\.zcode-beta|\.serena|\.build|\.swiftpm|xcuserdata|node_modules|dist|coverage)$/.test(p))||/\.(?:sqlite.*|db|log|pem|key|p12|pfx)$/i.test(path);
   const portableMac=new Set(['.github/workflows/ci.yml','scripts/audit-macos-bundle.mjs','script/distribute_macos.sh','script/install_macos.sh','docs/macos-roadmap.md','docs/release-checklist.md']);
   const allowed=publicRoots.has(path)||publicExtras.has(path)||portableMac.has(path)||/^(?:src|test)\/[^/]+\.ts$/.test(path)||/^native\/(?:macOS|Tests)\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.swift$/.test(path)||/^web\/(?:index\.html|src\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:tsx?|css|md))$/.test(path);
-  if(blocked||(!allowed&&!antigravityPublicFiles.has(path)))issues.push({path,rule:'non-public-path'});
+  if(blocked||(!allowed&&!auxiliaryPublicFiles.has(path)))issues.push({path,rule:'non-public-path'});
   if(!['100644','100755'].includes(mode)||stage!=='0')issues.push({path,rule:'non-regular-or-unmerged-file'});
   const buffer=git(['cat-file','blob',sha]);bytes+=buffer.length;
   if(buffer.includes(0)||buffer.length>2_000_000){issues.push({path,rule:'binary-or-oversize'});continue;}

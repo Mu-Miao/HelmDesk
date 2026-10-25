@@ -40,7 +40,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       case 'agents_list': { const agents=await agentCatalog();store.snapshot('agents',agents);store.snapshot('agent',agents[0]);return agents; }
       case 'models_list': { const input=z.object({agent:agentIdSchema.optional()}).strict().parse(args),agent=input.agent??modelPreference(store).agent??'qoder-cn';const catalog=await discoverFor(agent); store.snapshot('models', {...catalog,agent}); return { ...catalog,agent, preference: modelPreference(store),agentPreference:modelPreference(store,agent) }; }
       case 'model_preference_get': {const input=z.object({agent:agentIdSchema.optional()}).strict().parse(args);return modelPreference(store,input.agent);}
-      case 'model_preference_set': { const input = modelPreferenceSchema.parse(args),agent=input.agent??'qoder-cn'; const catalog = await discoverFor(agent); const preference = saveModelPreference(store, catalog.options, input.model, input.reasoningEffort,agent,input.makePrimary??agent!=='antigravity'); store.snapshot('models', {...catalog,agent}); return preference; }
+      case 'model_preference_set': { const input = modelPreferenceSchema.parse(args),agent=input.agent??'qoder-cn'; const catalog = await discoverFor(agent); const preference = saveModelPreference(store, catalog.options, input.model, input.reasoningEffort,agent,input.makePrimary??(agent!=='antigravity'&&agent!=='zcode')); store.snapshot('models', {...catalog,agent}); return preference; }
       case 'execution_policy_get':return policyView(store);
       case 'execution_policy_set':{
         const input=executionPolicySchema.parse(args);if(input.budgets.length){const catalog=await discoverModels();for(const rule of input.budgets)selectModel(catalog.options,rule.model);}
@@ -78,11 +78,11 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
         const configurationRevision=desktopConfiguration(store.directory).revision;
         const preference = modelPreference(store);
         const agent=input.agent??preference.agent??'qoder-cn',catalog=await discoverFor(agent);
-        if(agent==='antigravity'&&parsed.mode===undefined) input.mode='shared';
-        const requested=input.model??(agent===(preference.agent??'qoder-cn')?preference.model:agent==='antigravity'?modelPreference(store,agent).model:undefined);if(!requested)throw Error('指定其他执行器时须明确选择模型');
+        if((agent==='antigravity'||agent==='zcode')&&parsed.mode===undefined) input.mode='shared';
+        const requested=input.model??(agent===(preference.agent??'qoder-cn')?preference.model:(agent==='antigravity'||agent==='zcode')?modelPreference(store,agent).model:undefined);if(!requested)throw Error('指定其他执行器时须明确选择模型');
         const model = selectModel(catalog.options,requested,input.mode==='probe');
         const reasoningEffort = input.reasoningEffort ?? (agent===(preference.agent??'qoder-cn')&&model.id === preference.model ? preference.reasoningEffort : undefined);
-        const maxTurns=input.maxTurns??(agent==='ollama'||agent==='antigravity'?1:executionPolicy(store).maxTurns);
+        const maxTurns=input.maxTurns??(agent==='ollama'||agent==='antigravity'||agent==='zcode'?1:executionPolicy(store).maxTurns);
         if(input.mode==='probe'&&(input.capabilities?.skills.length||input.capabilities?.tools.length)) throw new Error('禁用工具的探测任务不能共享能力');
         const capabilities=sharing.selection(agent,input.mode,input.capabilities);
         const capabilityPins=await sharing.select(capabilities);
@@ -107,7 +107,7 @@ export function createApp(store: Store, scheduler: Scheduler, port: number, toke
       case 'task_cancel': return scheduler.cancel(id());
       case 'task_verify': return scheduler.verifyTask(id(), { status: z.enum(['passed', 'failed', 'not_run']).parse(args.status), command: z.string().max(2000).parse(args.command ?? ''), evidence: z.string().min(1).max(8000).parse(args.evidence) });
       case 'task_review': return scheduler.review(id(), z.enum(['accepted', 'changes_requested']).parse(args.acceptance), z.string().min(1).max(4000).parse(args.note));
-      case 'usage_get': { const task = args.taskId ? store.get(id()) : null; return { task: task?.usage ?? null, account: task?.agent==='antigravity'?{available:false,source:'Antigravity',reason:'尚未取得 Google 套餐额度快照；Qoder Credits 不代表 Google 余额'}:store.snapshot('quota') ?? { available: false, reason: '尚未取得官方用量接口快照' }, note: '每任务为新建会话，任务用量与会话累计不能相加；不汇总不同服务商余额' }; }
+      case 'usage_get': { const task = args.taskId ? store.get(id()) : null; return { task: task?.usage ?? null, account: task?.agent==='zcode'?{available:false,source:'ZCode',reason:'尚未取得 ZCode 套餐余额；ZCode Tokens 与 Qoder Credits 分开'}:task?.agent==='antigravity'?{available:false,source:'Antigravity',reason:'尚未取得 Google 套餐额度快照；Qoder Credits 不代表 Google 余额'}:store.snapshot('quota') ?? { available: false, reason: '尚未取得官方用量接口快照' }, note: '每任务为新建会话，任务用量与会话累计不能相加；不汇总不同服务商余额' }; }
       case 'capabilities_list': return sharing.view();
       case 'capabilities_refresh': return sharing.refresh();
       default: throw new Error('未知工具');

@@ -5,6 +5,8 @@
 .codex/
 .agents/
 .qoder/
+.zcode/
+.zcode-beta/
 connection.json
 sharing.json
 *.sqlite*
@@ -38,6 +40,7 @@ xcuserdata/
 !/docs/v0.1日常使用与验收.md
 !/docs/quickstart.md
 !/docs/antigravity.md
+!/docs/zcode.md
 !/docs/macos-install.md
 !/docs/macos-roadmap.md
 !/docs/release-checklist.md

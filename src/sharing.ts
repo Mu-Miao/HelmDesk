@@ -19,7 +19,7 @@ const id = z.string().regex(/^[a-z][a-z0-9-]{0,47}$/);
 const sharingSchema = z.object({ version:z.literal(1), skills:z.array(z.object({id, path:z.string().min(1), version:z.string().min(1).max(80), approved:z.literal(true)}).strict()).max(20).default([]),
   servers:z.array(z.object({id, source:z.string().min(1).max(300), approved:z.literal(true), command:z.string().min(1), args:z.array(z.string()).max(30).default([]), readRoots:z.array(z.string().min(1)).max(15).default([]), tools:z.array(z.string().regex(/^[A-Za-z0-9_-]{1,80}$/)).max(20), envFrom:z.array(z.string().regex(/^[A-Z][A-Z0-9_]*$/)).max(10).default([])}).strict()).max(10).default([]),
   remoteServers:z.array(z.object({id,source:z.string().min(1).max(300),approved:z.literal(true),url:z.literal('https://mcp.context7.com/mcp'),tools:z.array(z.enum(['resolve-library-id','query-docs'])).min(1).max(2)}).strict()).max(1).default([]),
-  defaults:z.object({agents:z.array(z.enum(['qoder-cn','antigravity'])).max(2),skills:z.array(id).max(20),tools:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}\/[A-Za-z0-9_-]{1,80}$/)).max(20)}).strict().optional()
+  defaults:z.object({agents:z.array(z.enum(['qoder-cn','antigravity','zcode'])).max(3),skills:z.array(id).max(20),tools:z.array(z.string().regex(/^[a-z][a-z0-9-]{0,47}\/[A-Za-z0-9_-]{1,80}$/)).max(20)}).strict().optional()
 }).strict();
 type ServerSource = z.infer<typeof sharingSchema>['servers'][number] | z.infer<typeof sharingSchema>['remoteServers'][number];
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');

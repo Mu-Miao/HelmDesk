@@ -3,9 +3,10 @@ import type { ModelOption, ModelPreference } from './model-types.js';
 import {resolveReasoningEffort, type ReasoningEffort} from './reasoning.js';
 import type {AgentId} from './agent-types.js';
 import {antigravityDefaultModel} from './antigravity.js';
+import {zcodeDefaultModel} from './zcode.js';
 export function modelPreference(store: Store, agent?:AgentId): ModelPreference {
   const primary=store.snapshot('modelPreference') as ModelPreference | null;
-  const preference=(agent&&agent!==(primary?.agent??'qoder-cn')?store.snapshot(`modelPreference:${agent}`) as ModelPreference|null:primary) ?? (agent==='antigravity'?{agent,model:antigravityDefaultModel,label:'Gemini 3.8 Flash (High)',kind:'platform' as const,updatedAt:null}:{agent,model:'Auto',label:'Auto',kind:'platform' as const,updatedAt:null});
+  const preference=(agent&&agent!==(primary?.agent??'qoder-cn')?store.snapshot(`modelPreference:${agent}`) as ModelPreference|null:primary) ?? (agent==='zcode'?{agent,model:zcodeDefaultModel,label:zcodeDefaultModel,kind:'platform' as const,updatedAt:null}:agent==='antigravity'?{agent,model:antigravityDefaultModel,label:'Gemini 3.8 Flash (High)',kind:'platform' as const,updatedAt:null}:{agent,model:'Auto',label:'Auto',kind:'platform' as const,updatedAt:null});
   return {...preference,reasoningEffort:preference.agent&&preference.agent!=='qoder-cn'?undefined:resolveReasoningEffort(preference.model,preference.reasoningEffort)};
 }
 export function selectModel(options: ModelOption[], requested: string,allowFailedProbe=false): ModelOption {
@@ -14,7 +15,7 @@ export function selectModel(options: ModelOption[], requested: string,allowFaile
   if(option.compatibility?.status==='failed'&&!allowFailedProbe)throw Error('所选自定义模型最近一次隔离探测失败；请先检查供应商连接并明确重新探测，不自动回退');
   return option;
 }
-export function saveModelPreference(store: Store, options: ModelOption[], requested: string, effort?: ReasoningEffort,agent:AgentId='qoder-cn',makePrimary=agent!=='antigravity'): ModelPreference {
+export function saveModelPreference(store: Store, options: ModelOption[], requested: string, effort?: ReasoningEffort,agent:AgentId='qoder-cn',makePrimary=agent!=='antigravity'&&agent!=='zcode'): ModelPreference {
   const option = selectModel(options, requested);
   const previous = modelPreference(store,agent);
   if(agent!=='qoder-cn'&&effort)throw Error('此执行器不支持 Qoder 的思考深度参数');

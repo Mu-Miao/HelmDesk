@@ -14,6 +14,7 @@ import {taskBudget} from './execution-policy.js';
 import {validateOllamaTask} from './ollama-executor.js';
 import {deliveryVersion,assertDeliveryVersion,assertVerifiedDelivery} from './verified-delivery.js';
 import {protectedDirectoryNames} from './protected-paths.js';
+import {validateZcodeTask} from './zcode-executor.js';
 import {validateAntigravityTask} from './antigravity-executor.js';
 
 interface ActiveTask { id:string; execution?:Execution; cancelled:boolean }
@@ -40,6 +41,7 @@ export class Scheduler {
     const previous=receipt?this.store.requestTask(receipt.key,receipt.hash):null;
     if(previous)return previous;
     if(input.agent==='ollama')validateOllamaTask(input as Task);
+    if(input.agent==='zcode')validateZcodeTask(input);
     if(input.agent==='antigravity')validateAntigravityTask(input);
     input={...input,reasoningEffort:input.agent&&input.agent!=='qoder-cn'?undefined:resolveReasoningEffort(input.model,input.reasoningEffort)};
     if (!isAbsolute(input.projectPath) || !statSync(input.projectPath).isDirectory()) throw new Error('项目路径必须是存在的绝对目录');
@@ -131,10 +133,10 @@ export class Scheduler {
     }
   }
   private recordUsage(id:string,result:any) {
-    const agent=this.store.get(id).agent,local=agent==='ollama',google=agent==='antigravity';
+    const agent=this.store.get(id).agent,local=agent==='ollama',google=agent==='antigravity',zcode=agent==='zcode';
     const numeric=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;
     const credits=numeric(result.total_credits);
-    this.store.patch(id,{sessionId:result.session_id,usage:{taskCredits:local||google?null:credits,sessionCredits:local||google?null:credits,inputTokens:numeric(result.usage?.input_tokens),outputTokens:numeric(result.usage?.output_tokens),usd:local||google?null:numeric(result.total_cost_usd),...(google?{thinkingTokens:numeric(result.antigravityUsage?.thinkingTokens),cacheReadTokens:numeric(result.antigravityUsage?.cacheReadTokens),totalTokens:numeric(result.antigravityUsage?.totalTokens)}:{}),tokenNote:google?'Tokens 来自 agy 完成事件；Google 套餐额度与 Qoder Credits 分开，费用未提供，保留未知':local?'Tokens 来自本地服务完成事件；CLI 未提供 Credits 或货币金额，保留未知':'CLI 返回的 0 不代表没有消耗 Tokens；美元为 0 不代表未扣 Credits',source:google?'official-agy.result；本任务为新建单轮会话':local?'official-ollama.generate；单次本地 CLI 请求':'official-sdk.result；本任务为新建单会话，累计值只记录一次'}});
+    this.store.patch(id,{sessionId:result.session_id,usage:{taskCredits:local||google||zcode?null:credits,sessionCredits:local||google||zcode?null:credits,inputTokens:numeric(result.usage?.input_tokens),outputTokens:numeric(result.usage?.output_tokens),usd:local||google||zcode?null:numeric(result.total_cost_usd),...(zcode?{thinkingTokens:numeric(result.zcodeUsage?.thinkingTokens),cacheReadTokens:numeric(result.zcodeUsage?.cacheReadTokens),totalTokens:numeric(result.zcodeUsage?.totalTokens)}:google?{thinkingTokens:numeric(result.antigravityUsage?.thinkingTokens),cacheReadTokens:numeric(result.antigravityUsage?.cacheReadTokens),totalTokens:numeric(result.antigravityUsage?.totalTokens)}:{}),tokenNote:zcode?'Tokens 来自 ZCode 官方模型请求完成事件；套餐余额、Credits 和货币费用未提供，保留未知':google?'Tokens 来自 agy 完成事件；Google 套餐额度与 Qoder Credits 分开，费用未提供，保留未知':local?'Tokens 来自本地服务完成事件；CLI 未提供 Credits 或货币金额，保留未知':'CLI 返回的 0 不代表没有消耗 Tokens；美元为 0 不代表未扣 Credits',source:zcode?'official-zcode.workspace/generateText；任务内请求用量累计一次':google?'official-agy.result；本任务为新建单轮会话':local?'official-ollama.generate；单次本地 CLI 请求':'official-sdk.result；本任务为新建单会话，累计值只记录一次'}});
   }
   cancel(id: string) {
     const task = this.store.get(id);

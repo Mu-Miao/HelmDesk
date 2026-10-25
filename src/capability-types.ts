@@ -16,6 +16,6 @@ export interface CapabilityCatalog {
   skills: (SourceDigest & { status: 'compatible'|'needs_adaptation'|'blocked'; reasons: string[] })[];
   servers: { id: string; source: string; status: 'ready'|'unavailable'; reason?: string; tools: SharedTool[] }[];
   exclusions: string[];
-  defaults?: CapabilitySelection & {agents:('qoder-cn'|'antigravity')[]};
+  defaults?: CapabilitySelection & {agents:('qoder-cn'|'antigravity'|'zcode')[]};
 }
 export interface WorkerGateway { url: string; token: string; skills: SkillSnapshot[]; tools: SharedTool[] }

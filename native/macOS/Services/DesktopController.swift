@@ -127,6 +127,10 @@ final class DesktopController {
             let agent = draftAgent
             models = try await service.toolCall("models_list", body: JSONEncoder().encode(Agent(agent: agent)))
             catalogAgent = agent
+            if let preferred = models?.agentPreference?.model, models?.options.contains(where: { $0.id == preferred }) == true {
+                draftModel = preferred
+                draftEffort = models?.agentPreference?.reasoningEffort ?? ""
+            }
         }
     }
     func saveModel() async {
@@ -135,7 +139,7 @@ final class DesktopController {
             let request = ModelRequest(agent: draftAgent, model: draftModel, reasoningEffort: draftAgent == "qoder-cn" && !draftEffort.isEmpty ? draftEffort : nil)
             let saved: DesktopModelPreference = try await service.toolCall("model_preference_set", body: JSONEncoder().encode(request))
             draftEffort = saved.reasoningEffort ?? ""
-            message = draftAgent == "antigravity" ? "辅助默认模型已保存；主要执行器保持原设置。" : "默认模型已保存，仅用于后续任务；已有任务保持原设置。"
+            message = ["antigravity", "zcode"].contains(draftAgent) ? "辅助默认模型已保存；主要执行器保持原设置。" : "默认模型已保存，仅用于后续任务；已有任务保持原设置。"
         }
     }
 }
