@@ -10,11 +10,11 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 ## 下载 Mac 应用
 
-**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.2/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.2)
+**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.4/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.4)
 
 > **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
 
-本次 **preview.2（应用构建号 2）** 修复 Qoder CN 新版自定义供应商模型接入：完整识别模型 ID，支持已有 `providers` 配置。已通过 `deepseek-v4.1-flash-1017` 的真实对话、隔离文件写入和安装版调用验收。
+本次 **preview.4（应用构建号 4）** 新增 **ZCode 辅助执行器**，默认 `GLM-5.3-Flash`，固定使用已登录 BigModel 的 ZCode Start Plan，支持提示词分析和已批准的共享只读能力。Qoder、Antigravity、ZCode 的默认模型分别保存。ZCode 实际请求当前遇到上游风控，已记录并停止重试；本版不宣称真实 GLM 对话验收通过。详见 [ZCode 接入与验证边界](docs/zcode.md)。
 
 1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
 2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。
@@ -161,7 +161,7 @@ node scripts/register-codex-mcp.mjs --apply
 | 沙箱检查不通过 | 查看 `doctor` 中的具体原因，当前只支持 macOS；不跳过隔离强行运行 |
 | 用量是未知 | 上游没有提供该字段；未知不等于零，不能据此判断免费 |
 
-Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。
+Credits、Tokens 和 USD 分别记录，任务消耗与账号快照也分开。累计阈值只能阻止后续派发，不能限制已经在途的费用。Ollama 当前只支持已安装本地模型的单轮无工具任务。可选的 [Antigravity 辅助执行器](docs/antigravity.md) 使用官方 `agy` CLI 和 Google 账号登录，默认 Gemini 3.8 Flash（High），处理分析、摘要和共享只读任务；辅助默认值与 Qoder 主要执行器分开保存。`shared` 模式使用已批准的 Skills 快照与只读 MCP，`probe` 保持无工具；Codex 专属连接器与 OAuth 授权不随包迁移。
 
 ## 开发与文档
 
@@ -173,7 +173,7 @@ npm run build
 
 自动测试使用本地替身、假数据和临时目录，不调用真实模型。部分测试需要宿主权限以监听 loopback 或检查 macOS 沙箱。`.npmrc` 禁止依赖安装脚本；`private: true` 防止误发布到 npm。
 
-本次发布前本地验证：Node **282 项**、Swift **29 项**通过；类型检查、生产构建、分发包审计通过。自定义 DeepSeek 的精确文本响应、隔离文件写入及安装版 MCP 调用已实测，原任务历史保留，任务文件未发现供应商密钥。包签名完整性、DMG 只读挂载和 ZIP 解压验包另行检查；这些检查不代表 Developer ID 签名、公证、异机兼容或第三方依赖实现审计。远端 CI 状态以 [GitHub Actions](https://github.com/Mu-Miao/HelmDesk/actions) 为准。
+本次发布的验证范围包含 Node **309 项**、Swift **29 项**测试、类型检查、生产构建和分发包审计。Gemini High 的共享 Skill、只读加法与 Context7 调用已有真实网关记录和独立验收，两个执行器的原有默认模型保持不变。包签名完整性、DMG 只读挂载、ZIP 解压验包及打包版 MCP 握手另行核对；这些检查不代表 Developer ID 签名、公证、异机兼容或第三方依赖实现审计。远端 CI 状态以 [GitHub Actions](https://github.com/Mu-Miao/HelmDesk/actions) 为准。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -203,4 +203,4 @@ npm run build
 
 玻璃导航、波纹和 AeroShards 等视觉效果源自 **React Bits**，部分版本经作者博客取用并适配。碎片背景固定于视口；缺少 WebGPU 或偏好减少动态效果时降级为静态背景。完整版权与条款见 [第三方来源与许可](THIRD_PARTY_NOTICES.md)。原创代码未另行指定统一开源许可证。
 
-v0.1 面向 macOS 本机单用户，已实现 Qoder CN 与受限 Ollama 适配；暂不支持远程访问、更高并发、Claude/Gemini 适配器、自动合并发布或无人值守续跑。
+v0.1 面向 macOS 本机单用户，已实现 Qoder CN、Antigravity、ZCode 与受限 Ollama 适配；暂不支持远程访问、更高并发、独立 Claude 适配器、自动合并发布或无人值守续跑。

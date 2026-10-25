@@ -13,10 +13,24 @@
       "id": "p3-fixture",
       "source": "Codex 为本地验收提供的标准 MCP；只读测试服务",
       "approved": false,
-      "command": "/absolute/path/to/node",
+      "command": "node",
       "args": ["/absolute/path/to/HelmDesk/scripts/fixtures/readonly-mcp.mjs"],
       "readRoots": ["/absolute/path/to/HelmDesk/scripts/fixtures", "/absolute/path/to/HelmDesk/node_modules"],
       "tools": ["add_numbers"]
     }
-  ]
+  ],
+  "remoteServers": [
+    {
+      "id": "context7",
+      "source": "Context7 官方公开文档 MCP，无凭据连接",
+      "approved": false,
+      "url": "https://mcp.context7.com/mcp",
+      "tools": ["resolve-library-id", "query-docs"]
+    }
+  ],
+  "defaults": {
+    "agents": ["qoder-cn", "antigravity"],
+    "skills": ["react-best-practices"],
+    "tools": ["p3-fixture/add_numbers", "context7/resolve-library-id", "context7/query-docs"]
+  }
 }

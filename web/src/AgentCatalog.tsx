@@ -2,6 +2,7 @@ import type { AgentInfo } from '../../src/agent-types.js';
 
 const MODE_LABELS: Record<AgentInfo['modes'][number], string> = {
   probe: '无工具任务',
+  shared: '共享只读任务',
   files: '文件任务',
 };
 

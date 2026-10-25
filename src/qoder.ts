@@ -21,9 +21,9 @@ export function findRuntime(): Runtime | null {
   return existsSync(appRuntime) ? { command: process.execPath, args: [appRuntime], path: appRuntime, source: 'app-runtime' } : null;
 }
 
-export async function runCommand(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}) {
+export async function runCommand(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv; replaceEnv?:boolean; timeoutMs?: number } = {}) {
   return new Promise<{ code: number | null; signal:NodeJS.Signals|null; stdout: string; stderr: string }>((resolve, reject) => {
-    const child = spawn(command, args, { cwd: options.cwd, env: { ...process.env, CI: '1', ...options.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd: options.cwd, env: options.replaceEnv ? {...options.env,CI:'1'} : { ...process.env, CI: '1', ...options.env }, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', overflow = false;
     const kill = () => {
       try { killOwnedGroup(child.pid); }

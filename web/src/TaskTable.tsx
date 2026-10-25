@@ -3,6 +3,7 @@ import type { Task } from '../../src/types.js';
 import { states, acceptance, failures, clock, number } from './api.js';
 import { Icon } from './Icon.js';
 import {dispositionLabels,matchesDisposition,canClassifyTask,type DispositionFilter} from '../../src/disposition-types.js';
+import {agentName} from '../../src/agent-types.js';
 export function TaskTable({ tasks, selected, onSelect, all,project,onProject }: { tasks: Task[]; selected?: string; onSelect: (id: string) => void; all: boolean;project:string;onProject:(path:string)=>void }) {
   const [query, setQuery] = useState(''), [status, setStatus] = useState('');
   const [handling,setHandling]=useState<DispositionFilter>('all');
@@ -27,7 +28,7 @@ export function TaskTable({ tasks, selected, onSelect, all,project,onProject }: 
     <div className="table-scroll"><table><thead><tr><th>任务</th><th>执行者 / 模型</th><th>执行状态</th><th>处理结论</th><th>任务用量</th><th>更新时间</th></tr></thead>
       <tbody>{visible.map(task => <tr className={selected === task.id ? 'selected' : ''} key={task.id}>
         <td><div className="task-label">{task.title.match(/^P\d+\s/) ? <span className="task-badge">{task.title.split(' ')[0]}</span> : null}<div><button className="task-name" onClick={() => onSelect(task.id)}>{task.title.replace(/^P\d+\s/, '')}</button><small>{task.acceptanceCriteria[0] ?? task.projectPath.split('/').at(-1)}</small></div></div></td>
-        <td>{task.agent==='ollama'?'Ollama 本地':'Qoder CN'}<small>{task.modelLabel ?? task.requestedModel}</small></td>
+        <td>{agentName(task.agent)}<small>{task.modelLabel ?? task.requestedModel}</small></td>
         <td><span className={`status status-${task.state}`}>{states[task.state]}</span><small>{task.disposition?'原始执行状态保留':task.state === 'completed' ? acceptance[task.acceptance] : failures[task.failureKind ?? ''] ?? (task.dependencies.length ? `${task.dependencies.length} 项依赖` : '独立任务')}</small></td>
         <td className="disposition-cell">{task.disposition?<><span className={`disposition-badge disposition-${task.disposition.status}`}>{dispositionLabels[task.disposition.status]}</span><small className="disposition-reason-preview" title={task.disposition.reason}>{task.disposition.reason}</small>{task.disposition.replacementTaskId?<button className="text-button" onClick={()=>onSelect(task.disposition!.replacementTaskId!)}>查看后续任务</button>:null}</>:<small>{canClassifyTask(task)?'待归类':'—'}</small>}</td>
         <td className="numeric">{number(task.usage?.taskCredits)}{task.usage?.taskCredits != null ? ' Credits' : ''}</td><td className="numeric">{clock(task.updatedAt)}</td>

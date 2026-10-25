@@ -28,7 +28,7 @@ export function revisionDraft(tasks:Task[],request:RevisionRequest,options:Model
   const prompt=`这是一次显式创建的修订任务，使用原项目的新独立副本。上一任务的工作文件不会自动带入。\n\n原始任务说明（背景）：\n${source.prompt}\n\n本次修订要求（优先执行）：\n${feedback}\n\n仍须遵守本任务的文件范围和验收条件，不得扩大权限。`;
   const input=submissionSchema.parse({title:`修订：${source.title.replace(/^修订[：:]\s*/,'')}`.slice(0,120),prompt,projectPath:source.projectPath,allowedFiles:[...source.allowedFiles],acceptanceCriteria:[...source.acceptanceCriteria],dependencies:[...source.dependencies],inputs:(source.inputs??[]).map(s=>({taskId:s.taskId,paths:[...s.paths]})),model:model.id,reasoningEffort,capabilities:{skills:[],tools:[]},mode:source.mode,timeoutSeconds:source.timeoutSeconds});
   validateScope(input.allowedFiles);if(input.mode==='files'&&!input.allowedFiles.length)throw Error('原文件任务缺少明确修改范围');
-  const submission={...input,agent:source.agent,maxTurns:source.maxTurns,probePurpose:source.probePurpose,model:model.id,modelLabel:model.label,revision:{sourceTaskId:source.id,rootTaskId:family.rootTaskId,feedback}};
+  const submission={...input,mode:source.mode,agent:source.agent,maxTurns:source.maxTurns,probePurpose:source.probePurpose,model:model.id,modelLabel:model.label,revision:{sourceTaskId:source.id,rootTaskId:family.rootTaskId,feedback}};
   const fingerprint=revisionHash({source,submission});
   return{sourceTaskId:source.id,sourceUpdatedAt:source.updatedAt,fingerprint,submission,notes:[
     '创建新的独立任务，保留原任务的状态、交付、用量和验收记录；原任务不会自动重试。',

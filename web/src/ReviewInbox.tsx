@@ -1,6 +1,7 @@
 import React from 'react';
 import type {Attention, ReviewCard} from '../../src/review-types.js';
 import type {State} from '../../src/types.js';
+import {agentName} from '../../src/agent-types.js';
 
 type Acceptance = ReviewCard['acceptance'];
 type Verification = ReviewCard['verification'];
@@ -109,7 +110,7 @@ function ReviewItem({card, onOpen}: {card: ReviewCard; onOpen: (id: string) => v
 			<dl className="review-meta">
 				<div className="review-meta-item">
 					<dt className="review-meta-key">智能体</dt>
-					<dd className="review-meta-value">{card.agent==='qoder-cn'?'Qoder CN':card.agent==='ollama'?'Ollama 本地':card.agent}</dd>
+					<dd className="review-meta-value">{agentName(card.agent)}</dd>
 				</div>
 				<div className="review-meta-item">
 					<dt className="review-meta-key">模型</dt>

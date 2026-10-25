@@ -10,12 +10,50 @@ import {mcpSandboxProfile,verifyAuthenticationReference} from '../src/isolation.
 import {runCommand} from '../src/qoder.js';
 function cleanup(root:string){function unseal(path:string){chmodSync(path,0o700);for(const entry of readdirSync(path,{withFileTypes:true}))if(entry.isDirectory())unseal(join(path,entry.name));}unseal(root);rmSync(root,{recursive:true,force:true});}
 
+test('approved sharing defaults apply to both agents, with explicit opt out and probe isolation',()=>{
+  const root=mkdtempSync(join(tmpdir(),'helm-sharing-defaults-')),store=new Store(root);
+  const config={version:1,skills:[{id:'guide',path:join(root,'guide'),version:'1',approved:true}],defaults:{agents:['qoder-cn','antigravity'],skills:['guide'],tools:[]}};
+  writeFileSync(join(root,'sharing.json'),JSON.stringify(config));
+  try {
+    const sharing=new Sharing(store,'http://127.0.0.1:4317');
+    for(const agent of ['qoder-cn','antigravity']) {
+      assert.deepEqual(sharing.selection(agent,'shared'),{skills:['guide'],tools:[]});
+      assert.deepEqual(sharing.selection(agent,'probe'),{skills:[],tools:[]});
+      assert.deepEqual(sharing.selection(agent,'files',{skills:[],tools:[]}),{skills:[],tools:[]});
+    }
+    assert.deepEqual(sharing.selection('ollama','shared'),{skills:[],tools:[]});
+    const selection=sharing.selection('qoder-cn','files');selection.skills.length=0;
+    assert.deepEqual(sharing.view().defaults?.skills,['guide']);
+    writeFileSync(join(root,'sharing.json'),JSON.stringify({...config,defaults:{...config.defaults,skills:['unknown']}}));
+    assert.throws(()=>new Sharing(store,'http://127.0.0.1:4317'),/批准目录/);
+    assert.throws(()=>sharing.selection('qoder-cn','files'),/配置已变化/);
+  }finally{store.close();cleanup(root);}
+});
+
+test('remote sharing accepts only the public Context7 endpoint and its two read-only query names',()=>{
+  const root=mkdtempSync(join(tmpdir(),'helm-sharing-remote-')),store=new Store(root);
+  const source={id:'context7',source:'Official public documentation MCP',approved:true,url:'https://mcp.context7.com/mcp',tools:['resolve-library-id','query-docs']};
+  try {
+    writeFileSync(join(root,'sharing.json'),JSON.stringify({version:1,remoteServers:[source],defaults:{agents:['qoder-cn','antigravity'],skills:[],tools:['context7/query-docs']}}));
+    const sharing=new Sharing(store,'http://127.0.0.1:4317');assert.deepEqual(sharing.selection('antigravity','shared').tools,['context7/query-docs']);
+    for(const patch of [{url:'http://127.0.0.1/private'},{url:'https://mcp.context7.com/mcp?key=secret'},{url:'https://mcp.context7.com/mcp/oauth'},{headers:{Authorization:'secret'}},{envFrom:['CONTEXT7_API_KEY']},{tools:['write-file']}]){
+      writeFileSync(join(root,'sharing.json'),JSON.stringify({version:1,remoteServers:[{...source,...patch}]}));
+      assert.throws(()=>new Sharing(store,'http://127.0.0.1:4317'));
+    }
+  }finally{store.close();cleanup(root);}
+});
+
 test('host integration checks and patch exports are never delegated through the worker gateway',()=>{
   const root=mkdtempSync(join(tmpdir(),'helmdesk-integration-gateway-')),store=new Store(root);
   try{for(const tool of ['task_brief_get','task_briefs_list','tasks_watch','task_integration_check','task_patch_export','task_revision_prepare','task_revision_submit']){
     writeFileSync(join(root,'sharing.json'),JSON.stringify({version:1,servers:[{id:'host',source:'test-only',approved:true,command:process.execPath,args:[resolve('scripts/fixtures/readonly-mcp.mjs')],readRoots:[resolve('scripts/fixtures')],tools:[tool]}]}));
     assert.throws(()=>new Sharing(store,'http://127.0.0.1:4317'),/不允许/);
-  }}finally{store.close();rmSync(root,{recursive:true,force:true});}
+  }
+    for(const command of ['npx','sh','/bin/sh']) {
+      writeFileSync(join(root,'sharing.json'),JSON.stringify({version:1,servers:[{id:'host',source:'test-only',approved:true,command,args:[resolve('scripts/fixtures/readonly-mcp.mjs')],readRoots:[resolve('scripts/fixtures')],tools:['add_numbers']}]}));
+      assert.throws(()=>new Sharing(store,'http://127.0.0.1:4317'),/MCP|Node/);
+    }
+  }finally{store.close();rmSync(root,{recursive:true,force:true});}
 });
 
 test('skill snapshots pin all resources, reject symlinks/secrets and detect source changes',()=>{
@@ -34,7 +72,7 @@ test('real sandboxed MCP gateway validates per-task selections, schema, snapshot
   const root=mkdtempSync(join(tmpdir(),'helmdesk-sharing-')),data=join(root,'data'),source=join(root,'source');mkdirSync(data);mkdirSync(source);mkdirSync(join(source,'references'));
   writeFileSync(join(source,'SKILL.md'),'A plain guide. Read references/rule.md.');writeFileSync(join(source,'references/rule.md'),'IMMUTABLE_RULE');
   const previousSecret=process.env.P3_UPSTREAM_TEST_SECRET;process.env.P3_UPSTREAM_TEST_SECRET='p3-fake-"secret\\only';
-  const config={version:1,skills:[{id:'guide',path:source,version:'1.0',approved:true}],servers:[{id:'fixture',source:'Local validation fixture',approved:true,command:process.execPath,args:[resolve('scripts/fixtures/readonly-mcp.mjs')],readRoots:[resolve('scripts/fixtures'),resolve('node_modules')],tools:['add_numbers','echo_fixture_secret'],envFrom:['P3_UPSTREAM_TEST_SECRET']}]};
+  const config={version:1,skills:[{id:'guide',path:source,version:'1.0',approved:true}],servers:[{id:'fixture',source:'Local validation fixture',approved:true,command:'node',args:[resolve('scripts/fixtures/readonly-mcp.mjs')],readRoots:[resolve('scripts/fixtures'),resolve('node_modules')],tools:['add_numbers','echo_fixture_secret'],envFrom:['P3_UPSTREAM_TEST_SECRET']}]};
   writeFileSync(join(data,'sharing.json'),JSON.stringify(config));
   const store=new Store(data),sharing=new Sharing(store,'http://127.0.0.1:4317');
   try {
