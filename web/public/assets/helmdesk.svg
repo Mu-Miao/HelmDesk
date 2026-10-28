@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<title>领航台 · HelmDesk</title>
+<defs>
+<linearGradient id="sea" gradientUnits="userSpaceOnUse" x1="220.000" y1="96.000" x2="820.000" y2="928.000"><stop offset="0.000" stop-color="#23485B" stop-opacity="1.000"/><stop offset="0.500" stop-color="#0B1E2D" stop-opacity="1.000"/><stop offset="1.000" stop-color="#081521" stop-opacity="1.000"/></linearGradient>
+<linearGradient id="needle" gradientUnits="userSpaceOnUse" x1="400.000" y1="704.000" x2="624.000" y2="320.000"><stop offset="0.000" stop-color="#7799AE" stop-opacity="1.000"/><stop offset="1.000" stop-color="#D5EAF1" stop-opacity="1.000"/></linearGradient>
+<linearGradient id="lit" gradientUnits="userSpaceOnUse" x1="458.000" y1="512.000" x2="704.000" y2="320.000"><stop offset="0.000" stop-color="#BCF8E5" stop-opacity="1.000"/><stop offset="1.000" stop-color="#F0FFF6" stop-opacity="1.000"/></linearGradient>
+<linearGradient id="mint" gradientUnits="userSpaceOnUse" x1="512.000" y1="566.000" x2="704.000" y2="320.000"><stop offset="0.000" stop-color="#3DCAB4" stop-opacity="1.000"/><stop offset="1.000" stop-color="#B0FFE6" stop-opacity="1.000"/></linearGradient>
+</defs>
+<path d="M928.000 512.000 L928.000 742.000 C928.000 844.725 844.725 928.000 742.000 928.000 L282.000 928.000 C179.275 928.000 96.000 844.725 96.000 742.000 L96.000 282.000 C96.000 179.275 179.275 96.000 282.000 96.000 L742.000 96.000 C844.725 96.000 928.000 179.275 928.000 282.000 Z" fill="url(#sea)"/>
+<path d="M928.000 512.000 L928.000 742.000 C928.000 844.725 844.725 928.000 742.000 928.000 L282.000 928.000 C179.275 928.000 96.000 844.725 96.000 742.000 L96.000 282.000 C96.000 179.275 179.275 96.000 282.000 96.000 L742.000 96.000 C844.725 96.000 928.000 179.275 928.000 282.000 Z" fill="none" stroke="#C9E9F2" stroke-opacity="0.180" stroke-width="2.000" stroke-linejoin="round"/>
+<path d="M512.000 268.000 C647.000 268.000 756.000 377.000 756.000 512.000 C756.000 647.000 647.000 756.000 512.000 756.000 C377.000 756.000 268.000 647.000 268.000 512.000 C268.000 377.000 377.000 268.000 512.000 268.000" fill="none" stroke="#A9DAE5" stroke-opacity="0.240" stroke-width="20.000" stroke-linejoin="round"/>
+<path d="M531.000 268.000 C531.000 278.493 522.493 287.000 512.000 287.000 C501.507 287.000 493.000 278.493 493.000 268.000 C493.000 257.507 501.507 249.000 512.000 249.000 C522.493 249.000 531.000 257.507 531.000 268.000 Z" fill="#D1EBF0" fill-opacity="1.000"/>
+<path d="M775.000 512.000 C775.000 522.493 766.493 531.000 756.000 531.000 C745.507 531.000 737.000 522.493 737.000 512.000 C737.000 501.507 745.507 493.000 756.000 493.000 C766.493 493.000 775.000 501.507 775.000 512.000 Z" fill="#83CDC8" fill-opacity="1.000"/>
+<path d="M320.000 634.000 C320.000 644.493 311.493 653.000 301.000 653.000 C290.507 653.000 282.000 644.493 282.000 634.000 C282.000 623.507 290.507 615.000 301.000 615.000 C311.493 615.000 320.000 623.507 320.000 634.000 Z" fill="#6992A8" fill-opacity="1.000"/>
+<path d="M704.000 320.000 L566.000 566.000 L320.000 704.000 L458.000 458.000 Z" fill="url(#needle)"/>
+<path d="M704.000 320.000 L512.000 512.000 L458.000 458.000 Z" fill="url(#lit)"/>
+<path d="M704.000 320.000 L566.000 566.000 L512.000 512.000 Z" fill="url(#mint)"/>
+<path d="M320.000 704.000 L512.000 512.000 L566.000 566.000 Z" fill="#4A718B" fill-opacity="1.000"/>
+<path d="M529.000 512.000 C529.000 521.389 521.389 529.000 512.000 529.000 C502.611 529.000 495.000 521.389 495.000 512.000 C495.000 502.611 502.611 495.000 512.000 495.000 C521.389 495.000 529.000 502.611 529.000 512.000 Z" fill="#163545" fill-opacity="1.000" stroke="#E7FFF8" stroke-opacity="0.850" stroke-width="5.000" stroke-linejoin="round"/>
+</svg>

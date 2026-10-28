@@ -13,8 +13,12 @@ swift build --package-path native --scratch-path "$SWIFT_SCRATCH" --product Helm
 BUILD_DIR="$(swift build --package-path native --scratch-path "$SWIFT_SCRATCH" --show-bin-path)"
 APP_BUNDLE="$ROOT_DIR/dist/HelmDesk.app"
 STAGE="$ROOT_DIR/dist/.HelmDesk-stage-$$.app"
-trap 'rm -rf "$STAGE"' EXIT
+ICON_STAGE="$(mktemp -d "$ROOT_DIR/dist/.HelmDesk-icon-XXXXXX")"
+trap 'rm -rf "$STAGE" "$ICON_STAGE"' EXIT
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources/runtime" "$STAGE/Contents/Resources/service/web"
+swift script/generate_icon.swift "$ICON_STAGE"
+cmp "$ICON_STAGE/HelmDesk.svg" web/public/assets/helmdesk.svg
+iconutil -c icns "$ICON_STAGE/HelmDesk.iconset" -o "$STAGE/Contents/Resources/HelmDesk.icns"
 cp "$BUILD_DIR/HelmDesk" "$STAGE/Contents/MacOS/HelmDesk"
 cp "$NODE_BIN" "$STAGE/Contents/Resources/runtime/node"
 npx tsc --outDir "$STAGE/Contents/Resources/service/dist" --sourceMap false
