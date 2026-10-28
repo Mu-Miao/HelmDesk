@@ -1,5 +1,7 @@
 # 领航台 · HelmDesk
 
+<img src="web/public/assets/helmdesk.svg" width="112" height="112" alt="领航台图标：深海蓝底板、薄荷色领航针与三枚协作节点">
+
 **让 Codex 调度 Qoder，让每一次交付都有据可查。**
 
 HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex 里描述目标，由它拆解任务、审查结果；Qoder 在独立工作区完成明确范围内的改动；领航台把队列、差异、验证和用量放进同一个中文看板。
@@ -10,11 +12,13 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 ## 下载 Mac 应用
 
-**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.4/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.4)
+**[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.5/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.5)
 
 > **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
 
-本次 **preview.4（应用构建号 4）** 新增 **ZCode 辅助执行器**，默认 `GLM-5.3-Flash`，固定使用已登录 BigModel 的 ZCode Start Plan，支持提示词分析和已批准的共享只读能力。Qoder、Antigravity、ZCode 的默认模型分别保存。ZCode 实际请求当前遇到上游风控，已记录并停止重试；本版不宣称真实 GLM 对话验收通过。详见 [ZCode 接入与验证边界](docs/zcode.md)。
+本次 **preview.5（应用构建号 5）** 加入「领航针」应用图标，统一 Dock、访达、网页导航与浏览器页签标识；原生 ICNS 和网页 SVG 由同一矢量源生成，打包时核对一致性与全部图标尺寸。详见 [图标设计与生成](docs/branding.md)。
+
+保留 **ZCode 辅助执行器**，默认 `GLM-5.3-Flash`，固定使用已登录 BigModel 的 ZCode Start Plan，支持提示词分析和已批准的共享只读能力。Qoder、Antigravity、ZCode 的默认模型分别保存。ZCode 上次实际请求遇到上游风控，已记录并停止重试；本版未重试，不宣称真实 GLM 对话验收通过。详见 [ZCode 接入与验证边界](docs/zcode.md)。
 
 1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
 2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。

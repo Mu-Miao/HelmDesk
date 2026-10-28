@@ -10,6 +10,7 @@
 - [ ] 报告、补丁实际保存并核对内容、大小与取消行为。
 - [ ] 合成任务分页、主题、长内容、键盘和静态降级检查完成。
 - [ ] 包签名完整性及组件审计通过，ZIP 解压后再次验包。
+- [ ] 应用 ICNS、全部标准/Retina 尺寸、网页标识和 favicon 一致；安装后系统图标可辨认，深浅主题与窄屏无缺图。
 - [ ] 公开检查通过，私有规划、记录与凭据未加入 Git。
 
 CI 选用 macos-15，显式使用镜像中的 Xcode 26.3，Actions 固定官方提交。参考 [runner 镜像说明](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md)和[工作流](../.github/workflows/ci.yml)。镜像会变化，升级需重核；配置存在不代表远端运行通过。
