@@ -24,13 +24,14 @@ import { appIdentity, type AppIdentity } from './app-runtime.js';
 import {DesktopService} from './desktop-service.js';
 import {desktopConfiguration} from './desktop-config.js';
 import {BrowserTickets,BrowserSessions} from './browser-session.js';
+import {CLIInstaller} from './cli-installation.js';
 
 import {briefSchema,taskBrief,briefPage,watchBriefs} from './review.js';
 export function sameSecret(actual: string | undefined, expected: string) {
   const a = Buffer.from(actual ?? ''), b = Buffer.from(expected); return a.length === b.length && timingSafeEqual(a, b);
 }
-export function createApp(store: Store, scheduler: Scheduler, port: number, token: string, discoverModels = listModels, sharing = new Sharing(store,`http://127.0.0.1:${port}`), identity: AppIdentity = appIdentity(store.directory, port), stop?:()=>void) {
-  const desktop=new DesktopService(store,scheduler,stop,port);
+export function createApp(store: Store, scheduler: Scheduler, port: number, token: string, discoverModels = listModels, sharing = new Sharing(store,`http://127.0.0.1:${port}`), identity: AppIdentity = appIdentity(store.directory, port), stop?:()=>void, installer=new CLIInstaller(store.directory)) {
+  const desktop=new DesktopService(store,scheduler,stop,port,installer);
   const discoverFor=async(agent:import('./agent-types.js').AgentId)=>{const catalog=await(agent==='qoder-cn'?discoverModels():agentModels(agent));return{...catalog,options:agent==='qoder-cn'?modelCompatibility(catalog.options,store.list()):catalog.options};};
   const browserTickets = new BrowserTickets(), browserSessions = new BrowserSessions();
   const hostname = `127.0.0.1:${port}`, origin = `http://${hostname}`;
@@ -225,12 +226,14 @@ export async function serve(directory: string, port: number, concurrency=1) {
   const scheduler = new Scheduler(store, new AgentExecutor(directory,sharing),[...desktopConfig.projectRoots,join(directory,'probe-project')],concurrency);
   const token = randomBytes(32).toString('hex');
   const identity = appIdentity(directory, port);
-  const server = createServer(createApp(store, scheduler, port, token,undefined,sharing,identity,()=>shutdown()));
+  const installer=new CLIInstaller(directory);
+  let shuttingDown=false;
+  const server = createServer(createApp(store, scheduler, port, token,undefined,sharing,identity,()=>shutdown(),installer));
   server.requestTimeout = 65000;
   try { await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); }); }
   catch (error) { unlinkSync(lockPath); store.close(); throw error; }
   writeFileSync(join(directory, 'connection.json'), JSON.stringify({ ...identity, pid: process.pid, token }), { mode: 0o600 });
-  const shutdown = () => { scheduler.stop(); server.close(); server.closeAllConnections(); void sharing.shutdown().finally(()=>{unlinkSync(lockPath); unlinkSync(join(directory, 'connection.json')); setTimeout(() => process.exit(), 250).unref();}); };
+  const shutdown = () => { if(shuttingDown)return;shuttingDown=true;scheduler.stop(); server.close(); server.closeAllConnections(); void Promise.allSettled([sharing.shutdown(),installer.cancel()]).finally(()=>{unlinkSync(lockPath); unlinkSync(join(directory, 'connection.json')); setTimeout(() => process.exit(), 250).unref();}); };
   process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
   console.log(`领航台已启动： http://127.0.0.1:${port}\n数据目录：${directory}\n隔离执行槽位：${concurrency}`);
   void agentCatalog().then(agents=>{store.snapshot('agents',agents);store.snapshot('agent',agents[0]);}).catch(() => {});

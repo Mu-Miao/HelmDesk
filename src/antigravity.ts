@@ -20,7 +20,7 @@ export function findAntigravity(): string | null {
     if (!existsSync(override)) throw Error('HELMDESK_AGY_CLI 路径不存在');
     return realpathSync(override);
   }
-  const candidates = [...(process.env.PATH ?? '').split(delimiter).map(p => join(p, 'agy')), join(homedir(), '.local/bin/agy')];
+  const candidates = [...(process.env.PATH ?? '').split(delimiter).filter(p=>p.startsWith('/')).map(p => join(p, 'agy')), '/opt/homebrew/bin/agy','/usr/local/bin/agy',join(homedir(), '.local/bin/agy')];
   const found = candidates.find(p => existsSync(p));
   return found ? realpathSync(found) : null;
 }
