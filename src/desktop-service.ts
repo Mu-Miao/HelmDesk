@@ -8,11 +8,20 @@ import {desktopConfiguration,saveDesktopConfiguration,desktopConfigSchema} from 
 import {createDataBackup,inspectData,listDataBackups,verifyDataBackup} from './data-maintenance.js';
 import {checkIsolation} from './isolation.js';
 import {detectAgent,listModels,runCommand} from './qoder.js';
+import {CLIInstaller} from './cli-installation.js';
 
 export class DesktopService {
   private applied;
-  constructor(private store:Store,private scheduler:Scheduler,private stop?:()=>void,port?:number) {this.applied=desktopConfiguration(store.directory);if(port)this.applied.configuration.preferredPort=port;}
+  constructor(private store:Store,private scheduler:Scheduler,private stop?:()=>void,port?:number,
+    private installer:Pick<CLIInstaller,'snapshot'|'refresh'|'start'|'cancel'>=new CLIInstaller(store.directory)) {this.applied=desktopConfiguration(store.directory);if(port)this.applied.configuration.preferredPort=port;}
   async execute(action:string,args:unknown) {
+    if(action==='installer-status') {z.object({}).strict().parse(args);return this.installer.snapshot();}
+    if(action==='installer-refresh') {z.object({}).strict().parse(args);return this.installer.refresh();}
+    if(action==='installer-start') {
+      const input=z.object({targets:z.array(z.enum(['qoder-cn','antigravity','ollama','zcode'])).min(1).max(4)}).strict().parse(args);
+      this.assertIdle();return this.installer.start(input.targets);
+    }
+    if(action==='installer-cancel') {z.object({}).strict().parse(args);return this.installer.cancel();}
     if(action==='status') {
       z.object({}).strict().parse(args);
       const saved=desktopConfiguration(this.store.directory);
@@ -50,6 +59,7 @@ export class DesktopService {
     throw Error('未知的原生应用操作');
   }
   private assertIdle() {
+    if(this.installer.snapshot().job?.state==='running')throw Error('CLI 安装正在进行，请先等待完成或取消安装');
     if(this.scheduler.queue().active||this.store.list().some(task=>['queued','preparing','running'].includes(task.state)))throw Error('请先处理排队和运行中的任务，再修改执行设置或重启服务');
   }
 }

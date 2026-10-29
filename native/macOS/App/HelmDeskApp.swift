@@ -6,12 +6,14 @@ struct HelmDeskApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var service: ServiceManager
     @State private var desktop: DesktopController
+    @State private var installer: CLIInstallationController
     @Environment(\.openWindow) private var openWindow
 
     init() {
         let manager = ServiceManager()
         _service = State(initialValue: manager)
         _desktop = State(initialValue: DesktopController(service: manager))
+        _installer = State(initialValue: CLIInstallationController(service: manager))
     }
 
     var body: some Scene {
@@ -31,6 +33,8 @@ struct HelmDeskApp: App {
                     .keyboardShortcut("0", modifiers: [.command])
             }
             CommandMenu("执行端") {
+                Button("CLI 安装…") { openWindow(id: "cli-installer") }
+                Divider()
                 Button("重新连接") { Task { await service.connect() } }.disabled(service.isConnecting)
                 Button("显示数据目录") { service.revealDataDirectory() }
                 Button("在浏览器打开") { service.openInBrowser() }.disabled(service.dashboardURL == nil)
@@ -40,12 +44,14 @@ struct HelmDeskApp: App {
             TabView {
                 DiagnosticsView(service: service).tabItem { Label("连接", systemImage: "network") }
                 DesktopSettingsView(controller: desktop).tabItem { Label("执行与数据", systemImage: "gearshape") }
+                CLIInstallationView(controller: installer).tabItem { Label("CLI 安装", systemImage: "shippingbox") }
             }
             .frame(width: 740, height: 720)
             .task { await desktop.refresh() }
             .onChange(of: service.instanceId) { Task { await desktop.refresh() } }
         }
         Window("导出任务报告", id: "reports") { ReportExportView(service: service) }.defaultSize(width: 640, height: 500)
+        Window("CLI 安装", id: "cli-installer") { CLIInstallationView(controller: installer) }.defaultSize(width: 720, height: 820)
     }
 }
 
