@@ -5,12 +5,16 @@ struct DeskWebView: NSViewRepresentable {
     let url: URL
     let onError: @MainActor (String) -> Void
     let onExport: @MainActor (String) -> Void
+    var onInstall: @MainActor () -> Void = {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(origin: url, onError: onError, onExport: onExport) }
+    func makeCoordinator() -> Coordinator { Coordinator(origin: url, onError: onError, onExport: onExport, onInstall: onInstall) }
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: "Object.defineProperty(window, '__HELMDESK_NATIVE__', {value:true});",
+            injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
@@ -30,8 +34,11 @@ struct DeskWebView: NSViewRepresentable {
         let origin: URL
         let onError: @MainActor (String) -> Void
         let downloads: DownloadManager
-        init(origin: URL, onError: @escaping @MainActor (String) -> Void, onExport: @escaping @MainActor (String) -> Void) {
+        let onInstall: @MainActor () -> Void
+        init(origin: URL, onError: @escaping @MainActor (String) -> Void, onExport: @escaping @MainActor (String) -> Void,
+             onInstall: @escaping @MainActor () -> Void = {}) {
             self.origin = origin; self.onError = onError
+            self.onInstall = onInstall
             downloads = DownloadManager(origin: origin, onMessage: onExport)
         }
 
@@ -44,6 +51,12 @@ struct DeskWebView: NSViewRepresentable {
             guard let target = navigationAction.request.url else { decisionHandler(.cancel); return }
             let source = navigationAction.sourceFrame.securityOrigin
             let sourceMatches = navigationAction.sourceFrame.isMainFrame && source.protocol == origin.scheme && source.host == origin.host && source.port == origin.port
+            if InstallerNavigationPolicy.allows(target, sourceScheme: source.protocol, sourceHost: source.host,
+                                                sourcePort: source.port, expectedOrigin: origin,
+                                                mainFrame: navigationAction.sourceFrame.isMainFrame,
+                                                linkActivated: navigationAction.navigationType == .linkActivated) {
+                onInstall(); decisionHandler(.cancel); return
+            }
             if sourceMatches, ExportPolicy(origin: origin).allows(target), navigationAction.shouldPerformDownload || target.scheme == "blob" {
                 decisionHandler(.download); return
             }

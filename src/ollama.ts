@@ -6,7 +6,7 @@ export const ollamaOrigin='http://127.0.0.1:11434';
 export function findOllama(){
   const override=process.env.HELMDESK_OLLAMA_CLI;
   if(override){if(!existsSync(override))throw Error('HELMDESK_OLLAMA_CLI 路径不存在');return realpathSync(override);}
-  return[...(process.env.PATH??'').split(delimiter).map(p=>join(p,'ollama')),'/Applications/Ollama.app/Contents/Resources/ollama'].find(p=>existsSync(p))??null;
+  return[...(process.env.PATH??'').split(delimiter).filter(p=>p.startsWith('/')).map(p=>join(p,'ollama')),'/opt/homebrew/bin/ollama','/usr/local/bin/ollama','/Applications/Ollama.app/Contents/Resources/ollama'].find(p=>existsSync(p))??null;
 }
 export function localOllamaModels(value:unknown):ModelOption[]{
   if(!value||typeof value!=='object'||!Array.isArray((value as any).models))throw Error('Ollama 模型目录格式变化');

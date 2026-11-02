@@ -50,6 +50,10 @@ small { font-size: 14px; color: var(--muted); }
 :root[data-theme="light"] .floating-header { border-color: #0000000e; box-shadow: inset 0 1px 1px #fff, 0 8px 32px #0000000f; }
 .brand { display: flex; align-items: center; gap: 13px; white-space: nowrap; font-size: 17px; font-weight: 600; letter-spacing: -.4px; }
 .brand-icon { display: block; flex-shrink: 0; }
+.cli-install-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; padding: 18px 0 22px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.cli-install-entry h3 { font-size: 16px; margin-bottom: 5px; }
+.cli-install-entry p { font-size: 13px; color: var(--muted); max-width: 650px; }
+.cli-install-entry .outline { flex-shrink: 0; }
 .brand span { display: flex; align-items: center; gap: 10px; }
 .brand small { font-size: 14px; font-weight: 400; letter-spacing: .15px; color: var(--muted); }
 .floating-header nav { display: flex; gap: 8px; align-items: center; }

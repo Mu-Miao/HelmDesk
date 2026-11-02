@@ -16,7 +16,7 @@ export function findRuntime(): Runtime | null {
     return { command: /\.[cm]?js$/.test(extname(override)) ? process.execPath : override, args: /\.[cm]?js$/.test(extname(override)) ? [override] : [], path: override, source: 'explicit' };
   }
   // qodercn is also used by an IDE dispatcher; prefer the actual CLI name.
-  const candidates = [...(process.env.PATH ?? '').split(delimiter).map(p => join(p, 'qoderclicn')), join(homedir(), '.local/bin/qoderclicn'), join(homedir(), '.qoder-cn/bin/qoderclicn/qoderclicn')];
+  const candidates = [...(process.env.PATH ?? '').split(delimiter).filter(p=>p.startsWith('/')).map(p => join(p, 'qoderclicn')), '/opt/homebrew/bin/qoderclicn','/usr/local/bin/qoderclicn',join(homedir(), '.local/bin/qoderclicn'), join(homedir(), '.qoder-cn/bin/qoderclicn/qoderclicn')];
   for (const path of candidates) if (existsSync(path)) return { command: path, args: [], path, source: 'official-cli' };
   return existsSync(appRuntime) ? { command: process.execPath, args: [appRuntime], path: appRuntime, source: 'app-runtime' } : null;
 }

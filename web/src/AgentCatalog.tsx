@@ -7,9 +7,18 @@ const MODE_LABELS: Record<AgentInfo['modes'][number], string> = {
 };
 
 export function AgentCatalog({ agents }: { agents: AgentInfo[] }) {
+  const nativeApp = typeof window !== 'undefined' && (window as Window & {__HELMDESK_NATIVE__?: boolean}).__HELMDESK_NATIVE__ === true;
   return (
     <section className="agent-catalog" aria-label="执行器目录">
       <h2>执行器目录</h2>
+      <div className="cli-install-entry">
+        <div>
+          <h3>安装需要的 CLI</h3>
+          <p>先检测 Homebrew，再选择执行器安装。已有安装与模型默认值会保留。</p>
+          {!nativeApp ? <p>请在领航台 Mac 应用中打开“执行端 → CLI 安装…”；浏览器不执行安装。</p> : null}
+        </div>
+        {nativeApp ? <a className="outline" href="helmdesk://cli-installation">选择并安装 CLI</a> : <a className="outline" href="https://brew.sh/">Homebrew 官网</a>}
+      </div>
 
       {agents.length === 0 ? (
         <p>尚未检查执行器</p>

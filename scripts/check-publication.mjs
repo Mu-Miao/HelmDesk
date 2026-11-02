@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 
 const git=args=>execFileSync('git',args,{maxBuffer:20_000_000});
 const publicRoots=new Set(['.gitignore','.npmrc','AGENTS.md','README.md','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','tsconfig.json','tsconfig.test.json','tsconfig.web.json','vite.config.ts']);
-const auxiliaryPublicFiles=new Set(['docs/antigravity.md','docs/zcode.md','scripts/antigravity-smoke.mjs']);
+const auxiliaryPublicFiles=new Set(['docs/antigravity.md','docs/zcode.md','docs/cli-installation.md','scripts/antigravity-smoke.mjs']);
 const brandingPublicFiles=new Set(['script/generate_icon.swift','web/public/assets/helmdesk.svg','docs/branding.md']);
 const publicExtras=new Set(['docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/quickstart.md','docs/macos-install.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs','native/Package.swift','native/Resources/Info.plist','native/Resources/Node-LICENSE.txt','native/Resources/Node-VERSION','script/build_and_run.sh','script/package_macos.sh']);
 const rules=[

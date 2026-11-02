@@ -2,11 +2,13 @@ import SwiftUI
 
 struct ContentView: View {
     let service: ServiceManager
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 0) {
             if let url = service.dashboardURL {
-                DeskWebView(url: url, onError: service.webViewFailed, onExport: service.recordExport).id(service.instanceId)
+                DeskWebView(url: url, onError: service.webViewFailed, onExport: service.recordExport,
+                            onInstall: { openWindow(id: "cli-installer") }).id(service.instanceId)
             } else if service.isConnecting {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -39,6 +41,7 @@ struct ContentView: View {
                     Button("浏览器") { service.openInBrowser() }
                 }
                 SettingsLink { Label("服务诊断", systemImage: "gearshape") }
+                Button("CLI 安装") { openWindow(id: "cli-installer") }
             }.font(.caption).padding(.horizontal, 14).padding(.vertical, 9)
         }
     }
