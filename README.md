@@ -1,6 +1,6 @@
 # 领航台 · HelmDesk
 
-<img src="web/public/assets/helmdesk.svg" width="112" height="112" alt="领航台图标：深海蓝底板、薄荷色领航针与三枚协作节点">
+<img src="web/public/assets/helmdesk.svg" width="112" height="112" alt="领航台图标：炭黑底板、柔粉色领航针与三枚协作节点">
 
 **让 Codex 调度 Qoder，让每一次交付都有据可查。**
 
@@ -18,7 +18,7 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 
 本次 **preview.6（应用构建号 6）** 加入 **CLI 安装管理**。在工具来源、底栏、执行端菜单或设置中打开“CLI 安装”：先检测 Homebrew，没有时引导自行前往官网安装；就绪后可多选 Qoder CN、Antigravity、Ollama、ZCode，依次安装并查看日志、取消或重新检测。已有安装和模型默认值保留，不自动登录、启动 Ollama 服务或下载模型。详见 [CLI 安装说明](docs/cli-installation.md)。
 
-保留 preview.5 的「领航针」应用图标，统一 Dock、访达、网页导航与浏览器页签标识；原生 ICNS 和网页 SVG 由同一矢量源生成。详见 [图标设计与生成](docs/branding.md)。
+「领航针」应用图标改用与界面一致的柔粉与炭黑配色，统一 Dock、访达、网页导航与浏览器页签标识；原生 ICNS 和网页 SVG 由同一矢量源生成。详见 [图标设计与生成](docs/branding.md)。
 
 保留 **ZCode 辅助执行器**，默认 `GLM-5.3-Flash`，固定使用已登录 BigModel 的 ZCode Start Plan，支持提示词分析和已批准的共享只读能力。Qoder、Antigravity、ZCode 的默认模型分别保存。ZCode 上次实际请求遇到上游风控，已记录并停止重试；本版未重试，不宣称真实 GLM 对话验收通过。详见 [ZCode 接入与验证边界](docs/zcode.md)。
 

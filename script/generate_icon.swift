@@ -50,28 +50,28 @@ orbit.addCurve(to: point(268, 512), control1: point(377, 756), control2: point(2
 orbit.addCurve(to: point(512, 268), control1: point(268, 377), control2: point(377, 268))
 
 let layers: [Layer] = [
-    Layer(path: tile, ramp: Ramp(id: "sea", from: point(220, 96), to: point(820, 928),
-                               colors: [Ink(hex: "#23485B"), Ink(hex: "#0B1E2D"), Ink(hex: "#081521")])),
-    Layer(path: tile, stroke: Ink(hex: "#C9E9F2", alpha: 0.18), width: 2),
-    Layer(path: orbit, stroke: Ink(hex: "#A9DAE5", alpha: 0.24), width: 20),
+    Layer(path: tile, ramp: Ramp(id: "charcoal", from: point(220, 96), to: point(820, 928),
+                               colors: [Ink(hex: "#29232B"), Ink(hex: "#101013"), Ink(hex: "#0A0A0C")])),
+    Layer(path: tile, stroke: Ink(hex: "#E3ADC9", alpha: 0.18), width: 2),
+    Layer(path: orbit, stroke: Ink(hex: "#C799B6", alpha: 0.24), width: 20),
     // Three waypoints stand for independently scoped collaborators around one helm.
-    Layer(path: circle(512, 268, 19), ink: Ink(hex: "#D1EBF0")),
-    Layer(path: circle(756, 512, 19), ink: Ink(hex: "#83CDC8")),
-    Layer(path: circle(301, 634, 19), ink: Ink(hex: "#6992A8")),
+    Layer(path: circle(512, 268, 19), ink: Ink(hex: "#F3DDE9")),
+    Layer(path: circle(756, 512, 19), ink: Ink(hex: "#E3ADC9")),
+    Layer(path: circle(301, 634, 19), ink: Ink(hex: "#8B7182")),
     // A broad, faceted needle remains readable at Dock and browser-tab sizes.
     Layer(path: polygon([point(704, 320), point(566, 566), point(320, 704), point(458, 458)]),
           ramp: Ramp(id: "needle", from: point(400, 704), to: point(624, 320),
-                     colors: [Ink(hex: "#7799AE"), Ink(hex: "#D5EAF1")])),
+                     colors: [Ink(hex: "#997D90"), Ink(hex: "#EAD5E1")])),
     Layer(path: polygon([point(704, 320), point(512, 512), point(458, 458)]),
           ramp: Ramp(id: "lit", from: point(458, 512), to: point(704, 320),
-                     colors: [Ink(hex: "#BCF8E5"), Ink(hex: "#F0FFF6")])),
+                     colors: [Ink(hex: "#E3ADC9"), Ink(hex: "#FFF2F8")])),
     Layer(path: polygon([point(704, 320), point(566, 566), point(512, 512)]),
-          ramp: Ramp(id: "mint", from: point(512, 566), to: point(704, 320),
-                     colors: [Ink(hex: "#3DCAB4"), Ink(hex: "#B0FFE6")])),
+          ramp: Ramp(id: "rose", from: point(512, 566), to: point(704, 320),
+                     colors: [Ink(hex: "#B86B96"), Ink(hex: "#F0C4DC")])),
     Layer(path: polygon([point(320, 704), point(512, 512), point(566, 566)]),
-          ink: Ink(hex: "#4A718B")),
-    Layer(path: circle(512, 512, 17), ink: Ink(hex: "#163545"),
-          stroke: Ink(hex: "#E7FFF8", alpha: 0.85), width: 5)
+          ink: Ink(hex: "#65525F")),
+    Layer(path: circle(512, 512, 17), ink: Ink(hex: "#1C171D"),
+          stroke: Ink(hex: "#F8E6F0", alpha: 0.85), width: 5)
 ]
 
 func number(_ value: CGFloat) -> String { String(format: "%.3f", Double(value)) }
