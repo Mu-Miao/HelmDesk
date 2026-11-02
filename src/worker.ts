@@ -9,6 +9,7 @@ import { toolDecision, fileTools } from './tool-policy.js';
 import {flashReasoningPolicy} from './reasoning.js';
 import { selectedProviderSettings } from './provider-models.js';
 import { join } from 'node:path';
+import {workerContract,FileTaskProgress} from './worker-contract.js';
 
 const spec = JSON.parse(readFileSync(process.argv[2]!, 'utf8')) as { prompt: string; cwd: string; runtime: string; model: string;maxTurns?:number; reasoningEffort?:import('./reasoning.js').ReasoningEffort; mode: 'probe' | 'shared' | 'files'; allowedFiles: string[]; quotaOnly?: boolean; gateway?:WorkerGateway; configDirectory?:string; inputs?:import('./input-types.js').InputFile[] };
 const provider = spec.model.startsWith('qoder-custom-') && spec.configDirectory ? selectedProviderSettings(join(spec.configDirectory,'provider-settings.json'),spec.model) : undefined;
@@ -22,6 +23,8 @@ async function* noPrompt(): AsyncGenerator<never> { await new Promise<void>(reso
 const tools = spec.mode === 'files' ? fileTools : [];
 const gateway=spec.mode!=='probe'?spec.gateway:undefined;
 const gatewayTools=gateway?[...(gateway.skills.length?['mcp__helm__read_skill']:[]),...(gateway.tools.length?['mcp__helm__call']:[])]:[];
+const contract=workerContract({...spec,gatewayTools});
+const progress=new FileTaskProgress(spec.mode==='files'&&spec.allowedFiles.length>0);
 async function forward(action:string,args:unknown) {
   const response=await fetch(`${gateway!.url}/${action}`,{method:'POST',headers:{Authorization:`Bearer ${gateway!.token}`,'Content-Type':'application/json'},body:JSON.stringify(args),signal:AbortSignal.timeout(15000)});
   const result=await response.json();if(!response.ok) throw new Error(result.error??'任务网关拒绝调用');return result;
@@ -36,6 +39,7 @@ const q = query({ prompt: spec.quotaOnly ? noPrompt() : sharingPrompt+inputPromp
   auth: qodercliAuth(), transport: ProcessTransport.default,
   pathToQoderCLIExecutable: spec.runtime, executable: 'node',
   cwd: spec.cwd, model: spec.model,
+  systemPrompt:{type:'preset',preset:'qodercli',append:contract},
   maxTurns:spec.maxTurns,
   resolveModel:spec.reasoningEffort?context=>{const policy=flashReasoningPolicy(context,spec.reasoningEffort);emit('reasoning',policy.evidence);return {parameters:policy.parameters};}:undefined,
   tools, allowedTools: [...tools,...gatewayTools], permissionMode: 'default',
@@ -44,7 +48,16 @@ const q = query({ prompt: spec.quotaOnly ? noPrompt() : sharingPrompt+inputPromp
     const decision = decide(input.tool_name, input.tool_input as Record<string, unknown>);
     emit('policy', { tool: input.tool_name, allowed: decision.allowed, reason: decision.reason });
     return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: decision.allowed ? 'allow' : 'deny', permissionDecisionReason: decision.reason } };
-  }] }] },
+  }] }], PostToolUse:[{hooks:[async input=>{
+    if(input.hook_event_name!=='PostToolUse')return {};
+    const context=progress.record(input.tool_name);
+    if(!context)return {};
+    emit('execution_progress',{kind:'read_without_write',message:context});
+    return {hookSpecificOutput:{hookEventName:'PostToolUse',additionalContext:context}};
+  }]}], PostToolUseFailure:[{hooks:[async input=>{
+    if(input.hook_event_name!=='PostToolUseFailure')return {};
+    return {hookSpecificOutput:{hookEventName:'PostToolUseFailure',additionalContext:`HelmDesk: use only the registered tools ${JSON.stringify([...tools,...gatewayTools])} and workspace ${JSON.stringify(spec.cwd)}. Bash/terminal/testing commands are unavailable; Codex handles host validation. Correct the reported tool input or state the blocker; do not repeat an unavailable operation.`}};
+  }]}] },
   canUseTool: async (name, input) => {
     const decision = decide(name, input);
     if (!decision.allowed) return { behavior: 'deny', message: decision.reason };
@@ -61,6 +74,7 @@ const q = query({ prompt: spec.quotaOnly ? noPrompt() : sharingPrompt+inputPromp
 try {
   await q.initializationResult();
   emit('execution_limits',{maxTurns:spec.maxTurns??null,source:'official-sdk.maxTurns',note:'请求的执行轮数上限；不表示实际已使用轮数或 Credits 硬上限'});
+  emit('execution_contract',{mode:spec.mode,workspace:spec.cwd,tools:[...tools,...gatewayTools],allowedFiles:spec.allowedFiles,hostValidation:true});
   emit('initialized', { sdk: '1.0.53', authentication: 'qodercliAuth', modelRequested: spec.model });
   const usagePromise = (async () => { try {
     const quota = await Promise.race([q.getUsageInfo(), new Promise<never>((_, reject) => { const t = setTimeout(() => reject(new Error('用量接口超时')), 8000); t.unref(); })]);
@@ -72,7 +86,7 @@ try {
       // Publish visible text and tool calls only, never reasoning/thinking blocks.
       const content = message.message.content.filter(part => part.type === 'text' || part.type === 'tool_use');
       emit('assistant', { content, usage: message.message.usage });
-    } else if (message.type === 'system' && message.subtype === 'init') emit('session', { sessionId: message.session_id, modelReported: message.model });
+    } else if (message.type === 'system' && message.subtype === 'init') emit('session', { sessionId: message.session_id, modelReported: message.model,toolsReported:message.tools,cwdReported:message.cwd });
     else if (message.type === 'user') emit('tool_result', { content: message.message.content });
   }
   await usagePromise;
