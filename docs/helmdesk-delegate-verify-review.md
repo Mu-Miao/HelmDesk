@@ -24,7 +24,9 @@ Skill 免费，模型调用使用你自己的账号，可能产生费用。本�
 
 从 Releases 下载 DMG，将 HelmDesk.app 拖入 Applications 后打开。在设置里授权一个具体的项目目录，确认 Qoder 已登录，保留已有模型或明确选择账号支持的模型。
 
-应用内置 Node、后端和网页，使用安装包不需要再运行 npm。源码方式需要 Git 和 Node.js 24+：
+应用内置 Node、后端和网页，使用安装包不需要再运行 npm。源码方式需要 Git 和 Node.js 24+。请在普通项目目录运行后台，不要把后台代码放在 `~/.codex/` 或 `~/.agents/`：HelmDesk 会禁止执行器读取这些宿主配置目录，放在其中的 worker 也会被阻止。该情况会发生在位于这些目录中的开发工作区，正常 Applications 安装不受这条路径限制影响。
+
+源码安装命令：
 
 ```sh
 git clone https://github.com/Mu-Miao/HelmDesk.git

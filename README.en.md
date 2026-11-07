@@ -18,6 +18,8 @@ HelmDesk is a local CLI agent workbench for macOS. Codex defines a scoped task, 
 
 The current instructions and examples are in Chinese. Codex as host with Qoder as executor has been tested locally; other host integrations have not been independently validated.
 
+Source installations: run the backend from an ordinary project directory, outside `~/.codex/` and `~/.agents/`. HelmDesk deliberately denies executor access to those host configuration directories. A backend placed there can start, but its worker will be unreadable inside the executor sandbox. See the [troubleshooting notes](docs/macos-install.md#源码后台位于受保护目录).
+
 ## The workflow
 
 | Stage | Responsibility |
