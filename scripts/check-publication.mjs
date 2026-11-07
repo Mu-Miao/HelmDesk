@@ -1,12 +1,15 @@
 // Inspect the Git index, not the working tree. Never print potential secret values.
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 
 const git=args=>execFileSync('git',args,{maxBuffer:20_000_000});
 const publicRoots=new Set(['.gitignore','.npmrc','AGENTS.md','README.md','README.en.md','THIRD_PARTY_NOTICES.md','package.json','package-lock.json','tsconfig.json','tsconfig.test.json','tsconfig.web.json','vite.config.ts']);
 const auxiliaryPublicFiles=new Set(['docs/antigravity.md','docs/zcode.md','docs/cli-installation.md','scripts/antigravity-smoke.mjs']);
 const officialSkillFiles=new Set(['skills/helmdesk-workflow/SKILL.md','skills/helmdesk-workflow/agents/openai.yaml','skills/helmdesk-workflow/references/tool-examples.md','skills/helmdesk-workflow/references/setup-and-validation.md','skills/helmdesk-workflow/assets/codex-mcp.toml.example']);
 const brandingPublicFiles=new Set(['script/generate_icon.swift','web/public/assets/helmdesk.svg','docs/branding.md']);
-const publicExtras=new Set(['docs/helmdesk-delegate-verify-review.md','docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/quickstart.md','docs/macos-install.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs','native/Package.swift','native/Resources/Info.plist','native/Resources/Node-LICENSE.txt','native/Resources/Node-VERSION','script/build_and_run.sh','script/package_macos.sh']);
+const publicExtras=new Set(['docs/helmdesk-delegate-verify-review.md','docs/workflow-demo.md','docs/codex-mcp.toml.example','docs/sharing.example.json','docs/v0.1日常使用与验收.md','docs/quickstart.md','docs/macos-install.md','docs/公开范围.md','docs/third-party/react-bits-LICENSE.md','scripts/register-codex-mcp.mjs','scripts/check-publication.mjs','scripts/fixtures/readonly-mcp.mjs','native/Package.swift','native/Resources/Info.plist','native/Resources/Node-LICENSE.txt','native/Resources/Node-VERSION','script/build_and_run.sh','script/package_macos.sh']);
+// Only this visually reviewed browser capture may bypass the text-only rule.
+const reviewedImages=new Map([['docs/media/workflow-review.jpg','0194a91f6f248bc2d4d21517a8eb95aa062303e42ffe283675693775e11de15a']]);
 const rules=[
   ['private-key',/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/g],
   ['github-token',/\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})\b/g],
@@ -27,9 +30,13 @@ for(const entry of entries){
   const blocked=path.split('/').some(p=>/^(?:\.helmdesk|\.env.*|\.git|\.aws|\.codex|\.agents|\.qoder|\.zcode|\.zcode-beta|\.serena|\.build|\.swiftpm|xcuserdata|node_modules|dist|coverage)$/.test(p))||/\.(?:sqlite.*|db|log|pem|key|p12|pfx)$/i.test(path);
   const portableMac=new Set(['.github/workflows/ci.yml','scripts/audit-macos-bundle.mjs','script/distribute_macos.sh','script/install_macos.sh','docs/macos-roadmap.md','docs/release-checklist.md']);
   const allowed=publicRoots.has(path)||publicExtras.has(path)||portableMac.has(path)||/^(?:src|test)\/[^/]+\.ts$/.test(path)||/^native\/(?:macOS|Tests)\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.swift$/.test(path)||/^web\/(?:index\.html|src\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:tsx?|css|md))$/.test(path);
-  if(blocked||(!allowed&&!auxiliaryPublicFiles.has(path)&&!brandingPublicFiles.has(path)&&!officialSkillFiles.has(path)))issues.push({path,rule:'non-public-path'});
+  if(blocked||(!allowed&&!auxiliaryPublicFiles.has(path)&&!brandingPublicFiles.has(path)&&!officialSkillFiles.has(path)&&!reviewedImages.has(path)))issues.push({path,rule:'non-public-path'});
   if(!['100644','100755'].includes(mode)||stage!=='0')issues.push({path,rule:'non-regular-or-unmerged-file'});
   const buffer=git(['cat-file','blob',sha]);bytes+=buffer.length;
+  if(reviewedImages.has(path)){
+    if(buffer.length>2_000_000||!buffer.subarray(0,3).equals(Buffer.from([0xff,0xd8,0xff]))||buffer.includes(Buffer.from('Exif\0\0'))||createHash('sha256').update(buffer).digest('hex')!==reviewedImages.get(path))issues.push({path,rule:'unreviewed-image-content'});
+    continue;
+  }
   if(buffer.includes(0)||buffer.length>2_000_000){issues.push({path,rule:'binary-or-oversize'});continue;}
   const text=buffer.toString('utf8');
   for(const [rule,pattern]of rules){pattern.lastIndex=0;for(const hit of text.matchAll(pattern))issues.push({path,rule,line:text.slice(0,hit.index).split('\n').length});}

@@ -14,6 +14,12 @@ HelmDesk turns delegated AI tasks into deliveries you can inspect, verify, and a
 
 [从派发到验收的完整实践](docs/helmdesk-delegate-verify-review.md) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
 
+![真实任务的执行状态、完整文件差异与验收结果](docs/media/workflow-review.jpg)
+
+[观看 55 秒工作流演示](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.7/helmdesk-workflow-demo.mp4) · [演示来源与验证范围](docs/workflow-demo.md)
+
+截图来自 2026-11-05 已完成独立验证与验收的真实任务；视频为该任务的截图剪辑回放，非连续录屏。界面中的零用量记录不能证明模型调用免费。
+
 ## 下载 Mac 应用
 
 **[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.7/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.7)

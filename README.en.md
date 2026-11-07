@@ -8,6 +8,12 @@ HelmDesk is a local CLI agent workbench for macOS. Codex defines a scoped task, 
 
 [中文说明](README.md)
 
+![Real task status, complete file diff, and acceptance](docs/media/workflow-review.jpg)
+
+[Watch the 55-second workflow demo](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.7/helmdesk-workflow-demo.mp4) · [Evidence and scope](docs/workflow-demo.md)
+
+This is an edited screenshot replay of a real task completed, independently verified, and accepted on November 5, 2026. It is not a continuous screen recording. Zero reported usage does not prove a free model call.
+
 ## Start here
 
 1. Download the Apple Silicon DMG from Releases and move HelmDesk.app to Applications. The app bundles Node and its server; a source installation needs Node.js 24+ and Git.
