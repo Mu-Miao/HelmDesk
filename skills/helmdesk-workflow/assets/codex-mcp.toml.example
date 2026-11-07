@@ -1,0 +1,10 @@
+# HelmDesk 源码方式 MCP 模板。先完成 npm run build。
+# 优先使用已安装 Mac 应用导出的 helmdesk-mcp.toml；本模板用于源码安装。
+# 把所有 /absolute/path/... 替换为真实绝对路径。不要写入真实用户名、私人路径、任务编号或凭据。
+# command/cwd/CLI 指向所用安装；--data-dir 与已运行服务的数据目录一致，数据目录可以位于安装目录之外。
+# 默认不额外设置并发，保持现有服务配置不变。如现有服务已显式配置槽位，请与其保持一致，不要因接入 MCP 重启或改动正在运行的服务。
+# 不要把本 MCP 中的派活、验证、验收工具转发给执行者；只有宿主可调用。
+[mcp_servers.helmdesk]
+command = "/absolute/path/to/node"
+cwd = "/absolute/path/to/HelmDesk"
+args = ["/absolute/path/to/HelmDesk/dist/cli.js", "mcp", "--data-dir", "/absolute/path/to/HelmDesk/.helmdesk", "--autostart-service"]
