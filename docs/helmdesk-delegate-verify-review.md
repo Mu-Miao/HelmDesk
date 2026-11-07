@@ -12,6 +12,10 @@ HelmDesk（领航台）把这段过程留在本机工作台。Codex 负责明确
 
 [下载 Mac 应用](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.7) · [第一次任务教程](https://github.com/Mu-Miao/HelmDesk/blob/main/docs/quickstart.md) · [免费官方 Skill](https://www.agensi.io/skills/helmdesk-workflow-delegate-verify-review)
 
+![真实任务的执行状态、单文件差异和验收结果](https://raw.githubusercontent.com/Mu-Miao/HelmDesk/main/docs/media/workflow-review.jpg)
+
+[观看 55 秒工作流演示](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.7/helmdesk-workflow-demo.mp4)。这是 2026-11-05 已验收任务的真实截图剪辑回放，非连续录屏；界面中的零用量不表示免费调用。
+
 ## 先确认是否适合你的环境
 
 当前安装产物面向 Apple Silicon Mac。部署目标是 macOS 14+，实际本机验收环境为 macOS 27；Intel 和其他 Mac 尚未独立验证。预发布应用只有 ad-hoc 本地签名，没有 Developer ID 签名和 Apple 公证，首次打开可能被 macOS 阻止。请先阅读[安装与故障处理](https://github.com/Mu-Miao/HelmDesk/blob/main/docs/macos-install.md)。

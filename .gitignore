@@ -46,6 +46,10 @@ xcuserdata/
 !/docs/release-checklist.md
 !/docs/branding.md
 !/docs/helmdesk-delegate-verify-review.md
+!/docs/workflow-demo.md
+!/docs/media/
+/docs/media/*
+!/docs/media/workflow-review.jpg
 !/docs/cli-installation.md
 !/docs/公开范围.md
 !/docs/third-party/
