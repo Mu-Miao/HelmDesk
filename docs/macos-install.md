@@ -72,3 +72,12 @@ npm ci --ignore-scripts
 安装并登录官方 ZCode App 后，在原生设置或网页模型设置中选择“ZCode · GLM 辅助”，刷新目录并保存 `GLM-5.3-Flash`。此默认值独立保存；Qoder 主要执行器保持原设置。也可用 `HELMDESK_ZCODE_CLI` 指定完整官方 CLI 入口。当前验证 CLI 0.17.x / BigModel Start Plan；无需在 HelmDesk 输入 API Key。
 
 本版本的真实 GLM 请求收到上游风控拒绝，已记录并停止重试。自动测试覆盖结构化协议、任务隔离、共享网关和失败处理，不代表该账号已经通过真实模型验收。详见 [ZCode 说明](zcode.md)。
+
+
+## 源码后台位于受保护目录
+
+如果后台从 `~/.codex/worktrees/…` 或 `~/.agents/…` 启动，界面和 MCP 可能可以连接，但任务进程会在开始模型请求前报告 `Cannot find module …/dist/worker.js`。即使文件实际存在，也可能是执行器沙箱禁止读取其所在目录。
+
+HelmDesk 的既有隔离规则禁止执行器读取或写入 `~/.codex/`、`~/.agents/`，用于保护宿主配置和 Skills。这不是缺少 Bash、模型失败或登录失效，不应据此切换模型、重装 CLI 或放宽宿主配置保护。
+
+源码开发时，将实际运行的后台代码和依赖放在普通项目目录，再从该目录构建并启动；仅将工作副本放在 Codex 管理目录、却仍从那里启动后台，并不能避开限制。Mac 应用通常位于 Applications，不因这条规则受阻。移动运行路径不会把原来的失败任务变成成功，是否重新执行仍需明确决定。

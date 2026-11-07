@@ -2,19 +2,26 @@
 
 <img src="web/public/assets/helmdesk.svg" width="112" height="112" alt="领航台图标：炭黑底板、柔粉色领航针与三枚协作节点">
 
-**让 Codex 调度 Qoder，让每一次交付都有据可查。**
+**把交给 AI 的任务，变成可以检查、验证和验收的交付。**
 
-HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex 里描述目标，由它拆解任务、审查结果；Qoder 在独立工作区完成明确范围内的改动；领航台把队列、差异、验证和用量放进同一个中文看板。
+HelmDesk（领航台）是本机 CLI Agent 协作工作台：Codex 明确任务范围、独立验证并决定验收，Qoder 在独立工作区执行。你可以检查它改了什么、验证了什么，以及是否接受这次交付；验收不会自动写回原项目。
 
-**macOS 原生应用 · 本地执行与数据 · TypeScript / React / SwiftUI · 28 项 MCP 工具**
+**[下载 Mac 应用](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.7) · [完成第一次任务](docs/quickstart.md) · [获取免费官方 Skill](https://www.agensi.io/skills/helmdesk-workflow-delegate-verify-review)**
 
-[快速上手](docs/quickstart.md) · [博客教程](https://blog.mashutaba.best/post/helmdesk-quickstart) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
+HelmDesk turns delegated AI tasks into deliveries you can inspect, verify, and accept. Codex coordinates and reviews; Qoder executes in a separate workspace. **[English guide](README.en.md)**
+
+目前面向 **Apple Silicon Mac + Codex + 已登录的 Qoder CN**。安装包内置 Node；源码安装需要 Node.js 24+。应用是未正式签名、未公证的预发布版，完整限制见下方安装说明。
+
+[从派发到验收的完整实践](docs/helmdesk-delegate-verify-review.md) · [使用与验收手册](docs/v0.1日常使用与验收.md) · [MCP 配置](docs/codex-mcp.toml.example) · [公开范围](docs/公开范围.md)
 
 ## 下载 Mac 应用
 
 **[下载 Apple Silicon DMG](https://github.com/Mu-Miao/HelmDesk/releases/download/v0.1.0-macos-preview.7/HelmDesk-0.1.0-macos-arm64-local-unsigned.dmg)** · [预发布说明、ZIP 与 SHA256](https://github.com/Mu-Miao/HelmDesk/releases/tag/v0.1.0-macos-preview.7)
 
 > **未正式签名、未公证的预发布版。** 应用仅包含 ad-hoc 本地签名，没有 Developer ID 开发者签名，也未经过 Apple 公证；DMG 本身未签名。macOS 可能阻止首次打开。本版本适合了解这些限制的用户试用，不代表已通过 Gatekeeper 分发验证。
+
+<details>
+<summary>当前预发布版本与已验证范围</summary>
 
 本次 **preview.7（应用构建号 7）** 修复 Qoder 文件任务的执行引导：启动时明确工作副本、实际工具、可写范围和宿主验证责任，避免寻找不存在的 Bash；只读探索过久时提示推进或报告阻塞。没有放开 Shell、增加轮数或切换模型。真实内置 `Qwen3.8-Flash / xhigh` 在 18 轮上限内用 6 轮完成 Edit / Write，宿主独立验证的 7 项测试通过；这是文件修改链路验证，不保证所有复杂任务都能在同样轮数内完成。
 
@@ -23,6 +30,8 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 「领航针」应用图标改用与界面一致的柔粉与炭黑配色，统一 Dock、访达、网页导航与浏览器页签标识；原生 ICNS 和网页 SVG 由同一矢量源生成。详见 [图标设计与生成](docs/branding.md)。
 
 保留 **ZCode 辅助执行器**，默认 `GLM-5.3-Flash`，固定使用已登录 BigModel 的 ZCode Start Plan，支持提示词分析和已批准的共享只读能力。Qoder、Antigravity、ZCode 的默认模型分别保存。ZCode 上次实际请求遇到上游风控，已记录并停止重试；本版未重试，不宣称真实 GLM 对话验收通过。详见 [ZCode 接入与验证边界](docs/zcode.md)。
+
+</details>
 
 1. 下载并打开 DMG，将 **HelmDesk.app** 拖到 Applications。
 2. 双击启动；应用已内置 Node、后端、生产网页和依赖，无需另装 Node 或在终端运行 npm。
@@ -34,6 +43,18 @@ HelmDesk 是一个在本机运行的 CLI Agent 协作工作台。你在 Codex �
 SwiftUI / WKWebView 容器提供执行器与项目目录设置、换端口与空闲重启、诊断、一致性数据库备份、原生报告/补丁保存和 MCP 配置导出。执行验证绑定交付版本，旧证据不能放行变化后的交付。iOS 和手机连接暂缓，后续手机定位为 Mac 的镜像控制端。
 
 详见 [安装与故障处理](docs/macos-install.md)、[Mac 功能范围](docs/macos-roadmap.md)和[发布检查表](docs/release-checklist.md)。第三方许可与组件清单随包提供；GitHub 源码不包含个人配置、模型凭据、真实数据库或任务记录。
+
+## 免费官方工作流 Skill
+
+[HelmDesk Workflow: Delegate, Verify & Review](https://www.agensi.io/skills/helmdesk-workflow-delegate-verify-review) 已通过 Agensi 审核并免费上架。也可直接查看仓库内的 [SKILL.md](skills/helmdesk-workflow/SKILL.md) 和[接入说明](skills/helmdesk-workflow/references/setup-and-validation.md)。
+
+它指导宿主明确项目与允许文件、派发任务、检查完整交付，并分别记录验证与验收。需要先安装本机 HelmDesk 并接通 MCP；Skill 包本身不包含运行中的服务器，也不能代替实际沙箱和文件权限。
+
+第一次可以从专用干净演示仓库开始：
+
+> 使用 helmdesk-workflow，通过领航台只创建 HELLO.md。沿用已保存的 Qoder 模型，完成后读取完整文件、核对允许范围和原项目未变，分别记录验证与验收。暂不整合；失败不自动重试。
+
+指令与示例为中文，已验证 Codex 宿主 + Qoder 执行器；其他宿主未独立验收。**Skill 免费，模型调用仍使用自己的账号并可能产生费用。** 负责派发和审核的宿主 Skill 不应共享给执行者。
 
 ## 它解决什么问题
 
